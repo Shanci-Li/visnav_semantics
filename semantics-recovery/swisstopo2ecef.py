@@ -19,9 +19,18 @@ def coordinate_transform(big_pic):
         if pt[0] == -1:
             pt_wgs84 = pt
         else:
-            pt_wgs84 = r.transform(pt, 'lv95', 'ln02', 'wgs84', 'ln02')
-            pt_wgs84 = r.transform(pt_wgs84, 'wgs84', 'ln02', 'wgs84', 'wgs84')
+            # import pdb
+            # print('Original:', pt)
+            # pt_wgs84 = r.transform(pt.copy(), 'lv95', 'ln02', 'wgs84', 'ln02')
+            # pt_wgs84 = r.transform(pt_wgs84, 'wgs84', 'ln02', 'wgs84', 'wgs84')
+            # pt_wgs84 = geographic_to_ecef(*pt_wgs84)
+            # print("Pipeline1:", pt_wgs84)
+
+            """ this should work """
+            pt_wgs84 = r.transform(pt.copy(), 'lv95', 'ln02', 'wgs84', 'wgs84')
             pt_wgs84 = geographic_to_ecef(*pt_wgs84)
+            # print("Pipeline2:", pt_wgs84)
+
         big_pic_wgs84[idx] = pt_wgs84
     return big_pic_wgs84
 
