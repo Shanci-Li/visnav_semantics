@@ -171,7 +171,7 @@ def main():
                 if len(selected_pc):
                     semantic_label = sc_query(_sc_split[row, col], selected_pc, nodata_value=-1.0)
                 else:
-                    semantic_label = -np.ones_like(selected_pc.cpu().numpy())[:, :, 0]
+                    semantic_label = -np.ones_like(selected_pc)[:, :, 0]
                 semantics_label_ls[row][col] = semantic_label
 
         semantics_label = np.block(semantics_label_ls)
