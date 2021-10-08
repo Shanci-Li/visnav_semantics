@@ -192,7 +192,7 @@ def main():
 
     args = config_parser()
     downsample_rate = args.downsample_rate
-    max_mem_GB = 5
+    max_mem_GB = 31
 
     # read point cloud with semantic label data from .npy file
     _big_pc_label = np.load("big_pc_label.npy")  # [X, 4]
