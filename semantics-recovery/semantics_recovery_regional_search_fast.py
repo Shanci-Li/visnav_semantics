@@ -39,18 +39,18 @@ def apply_offset(pc: np.ndarray, offset: np.ndarray, scale: float = 1.0, nodata_
     return pc
 
 
-def pc_local_search(big_pc: torch.tensor, ref_patch: np.ndarray, nodata_value: float = -1.0):
+def pc_local_search(big_pc: torch.Tensor, ref_patch: torch.Tensor, nodata_value: float = -1.0):
     """
     Point cloud local search based on XYZ boundaries.
     @param big_pc:          [N, D] point cloud. (D >= 3, the fourth and later columns are non-coordinates)
     @param ref_patch:       [K, 3] point cloud as reference.
     @param nodata_value:    Float number for nodata value.
     """
-    if ref_patch.size == np.sum(ref_patch == -1):
+    if ref_patch.numel() == torch.sum(ref_patch == nodata_value).item():
         selected_pc = []
     else:
-        xyz_max = ref_patch[ref_patch[:, 1] != nodata_value].max(axis=0)  # [3]
-        xyz_min = ref_patch[ref_patch[:, 1] != nodata_value].min(axis=0)  # [3]
+        xyz_max, _ = ref_patch[ref_patch[:, 1] != nodata_value].max(dim=0)  # [3]
+        xyz_min, _ = ref_patch[ref_patch[:, 1] != nodata_value].min(dim=0)  # [3]
 
         selected_pc = big_pc[(big_pc[:, 0] <= xyz_max[0]) & (big_pc[:, 1] <= xyz_max[1]) & (big_pc[:, 2] <= xyz_max[2])
                              & (big_pc[:, 0] >= xyz_min[0]) & (big_pc[:, 1] >= xyz_min[1]) & (big_pc[:, 2] >= xyz_min[2])
