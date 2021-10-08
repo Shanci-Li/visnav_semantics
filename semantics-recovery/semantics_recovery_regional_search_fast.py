@@ -130,7 +130,7 @@ def sc_query(sc: torch.Tensor, pc: torch.Tensor, nodata_value: float = -1.0):
 def main():
     downsample_rate = 1
     scale = 1.0
-    block_h, block_w = 24, 16  # GPU memory hungry
+    block_h, block_w = 48, 48  # GPU memory hungry
     origin = get_ecef_origin()
 
     # read point cloud with semantic label data from .npy file
