@@ -200,7 +200,9 @@ def main():
                 del selected_pc
 
         semantics_label = np.block(semantics_label_ls)  # [H, W]
-        semantics_distance = np.block(semantics_distance_ls)  # [H, W]
+        semantics_label[semantics_label == -1] = 0
+        semantics_label = np.array(semantics_label, np.uint8)
+        semantics_distance = np.block(semantics_distance_ls).astype(np.float32)  # [H, W]
         tiem_elapsed = time.time() - time_start
         print("Semantics label recovery time: {:.1f}s, unique labels: {}".format(tiem_elapsed, np.unique(semantics_label)))
         torch.cuda.empty_cache()
