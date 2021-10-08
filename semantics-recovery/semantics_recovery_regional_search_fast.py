@@ -22,7 +22,7 @@ def get_ecef_origin():
 
 def apply_offset(pc: np.ndarray, offset: np.ndarray, scale: float = 1.0, nodata_value: float = None):
     """
-    Apply shift to the pc
+    Apply shift to the point cloud data.
     @param pc:              [N, X] point cloud. (X >= 3, the fourth and later columns are non-coordinates)
     @param offset:          [3] offset vector.
     @param scale:           Float number for scaling.
@@ -54,7 +54,7 @@ def pc_local_search(big_pc: torch.tensor, ref_patch: np.ndarray, nodata_value: f
 
         selected_pc = big_pc[(big_pc[:, 0] <= xyz_max[0]) & (big_pc[:, 1] <= xyz_max[1]) & (big_pc[:, 2] <= xyz_max[2])
                              & (big_pc[:, 0] >= xyz_min[0]) & (big_pc[:, 1] >= xyz_min[1]) & (big_pc[:, 2] >= xyz_min[2])
-                             ].clone()  # [M, X]
+                             ]  # [M, X]
         if len(selected_pc) == 0:
             selected_pc = []
     return selected_pc
@@ -130,7 +130,7 @@ def sc_query(sc: torch.Tensor, pc: torch.Tensor, nodata_value: float = -1.0):
 def main():
     downsample_rate = 1
     scale = 1.0
-    block_h, block_w = 24, 36
+    block_h, block_w = 48, 48  # GPU memory hungry
     origin = get_ecef_origin()
 
     # read point cloud with semantic label data from .npy file
@@ -160,31 +160,19 @@ def main():
 
         _sc_split = split_scene_coord(_sc, block_h, block_w)  # [rows, cols, b_h, b_w, 3]
 
-        selected_pc_ls = [[[] for _ in range(_sc_split.shape[1])] for _ in range(_sc_split.shape[0])]
-        for row in range(_sc_split.shape[0]):
-            for col in range(_sc_split.shape[1]):
-                # time_start = time.time()
-                selected_pc_ls[row][col] = pc_local_search(_big_pc_label_tensor, _sc_split[row, col].reshape(-1, 3),
-                                                           nodata_value=-1)  # [X, 4]
-                # time_elapsed = time.time() - time_start
-                # print('\rSelecting local point cloud, row {:d} col {:d} time: {:.2f}s, #points: {:d}'.format(row, col, time_elapsed, len(selected_pc_ls[row][col])),
-                #       end='', flush=True)
-
         flag_tensor, _sc_split = convert_to_tensor(_sc_split, cuda=True, retain_tensor=True)
         assert flag_tensor
 
         semantics_label_ls = [[[] for _ in range(_sc_split.shape[1])] for _ in range(_sc_split.shape[0])]
         for row in range(_sc_split.shape[0]):
             for col in range(_sc_split.shape[1]):
-                # time_start = time.time()
-                if len(selected_pc_ls[row][col]):
-                    semantic_label = sc_query(_sc_split[row, col], selected_pc_ls[row][col], nodata_value=-1.0)
+                selected_pc = pc_local_search(_big_pc_label_tensor, _sc_split[row, col].reshape(-1, 3),
+                                              nodata_value=-1)  # [X, 4]
+                if len(selected_pc):
+                    semantic_label = sc_query(_sc_split[row, col], selected_pc, nodata_value=-1.0)
                 else:
-                    semantic_label = -np.ones_like(_sc_split[row, col].cpu().numpy())[:, :, 0]
+                    semantic_label = -np.ones_like(selected_pc.cpu().numpy())[:, :, 0]
                 semantics_label_ls[row][col] = semantic_label
-                # time_elapsed = time.time() - time_start
-                # print('\rRetrieving semantic labels, row {:d} col {:d} time: {:.2f}s'.format(row, col, time_elapsed),
-                #       end='', flush=True)
 
         semantics_label = np.block(semantics_label_ls)
         np.save('semantics_label_{:s}'.format(file_name), semantics_label)
