@@ -39,7 +39,7 @@ def apply_offset(pc: np.ndarray, offset: np.ndarray, scale: float = 1.0, nodata_
     return pc
 
 
-def pc_local_search(big_pc: np.ndarray, ref_patch: np.ndarray, nodata_value: float = -1.0):
+def pc_local_search(big_pc: torch.tensor, ref_patch: np.ndarray, nodata_value: float = -1.0):
     """
     Point cloud local search based on XYZ boundaries.
     @param big_pc:          [N, D] point cloud. (D >= 3, the fourth and later columns are non-coordinates)
@@ -54,7 +54,7 @@ def pc_local_search(big_pc: np.ndarray, ref_patch: np.ndarray, nodata_value: flo
 
         selected_pc = big_pc[(big_pc[:, 0] <= xyz_max[0]) & (big_pc[:, 1] <= xyz_max[1]) & (big_pc[:, 2] <= xyz_max[2])
                              & (big_pc[:, 0] >= xyz_min[0]) & (big_pc[:, 1] >= xyz_min[1]) & (big_pc[:, 2] >= xyz_min[2])
-                             ]  # [M, X]
+                             ].clone()  # [M, X]
         if len(selected_pc) == 0:
             selected_pc = []
     return selected_pc
@@ -82,9 +82,12 @@ def split_scene_coord(sc: np.ndarray, block_h: int, block_w: int):
     return np.array(sc_split)
 
 
-def try_making_float16_tensor(data: np.ndarray, cuda=False, retain_tensor=False):
+def convert_to_tensor(data: np.ndarray, cuda=False, retain_tensor=False, float16=False):
     """Try making float 16 tensor."""
-    data_tensor = torch.tensor(data).half()
+    if float16:
+        data_tensor = torch.tensor(data).half()
+    else:
+        data_tensor = torch.tensor(data).float()
     flag_ok = torch.isnan(data_tensor).sum() == 0 and torch.isinf(data_tensor).sum() == 0
     data_tensor = data_tensor if retain_tensor else torch.zeros(1)
 
@@ -126,14 +129,16 @@ def sc_query(sc: torch.Tensor, pc: torch.Tensor, nodata_value: float = -1.0):
 
 def main():
     downsample_rate = 1
+    scale = 1.0
+    block_h, block_w = 24, 36
     origin = get_ecef_origin()
 
     # read point cloud with semantic label data from .npy file
     _big_pc_label = np.load("big_pc_label.npy")  # [X, 4]
-    _big_pc_label = apply_offset(_big_pc_label, origin, scale=10.0, nodata_value=None)  # [X, 4]
+    _big_pc_label = apply_offset(_big_pc_label, origin, scale, nodata_value=None)  # [X, 4]
 
-    flag_float16, _big_pc_label_tensor = try_making_float16_tensor(_big_pc_label, cuda=True, retain_tensor=True)
-    assert flag_float16, "Cannot build float16 tensor for the original data (w/ offset)!"
+    flag_tensor, _big_pc_label_tensor = convert_to_tensor(_big_pc_label, cuda=True, retain_tensor=True)
+    assert flag_tensor, "Cannot build tensor for the original data (w/ offset)!"
 
     file_ls = os.listdir('scene_coord')
     file_ls = ['_'.join(item.split('_')[:-1]) for item in file_ls]
@@ -148,12 +153,11 @@ def main():
         raw_image = io.imread('scene_coord/{:s}_img.png'.format(file_name))[:, :, :3]
         _sc = _sc[::downsample_rate, ::downsample_rate, :]  # [H, W, 3]
         _sc_raw_size = _sc.shape  # [H, W, 3]
-        _sc = apply_offset(_sc.reshape(-1, 3), origin, scale=10.0, nodata_value=-1).reshape(_sc_raw_size)  # [H, W, 3], numpy array
+        _sc = apply_offset(_sc.reshape(-1, 3), origin, scale, nodata_value=-1).reshape(_sc_raw_size)  # [H, W, 3], numpy array
 
-        flag_float16, sc = try_making_float16_tensor(_sc, cuda=True, retain_tensor=True)  # bool, [K, 3] tensor
-        assert flag_float16, "Scene coordinates at {:s} cannot be converted into float16 tensor!".format(file_name)
+        flag_tensor, sc = convert_to_tensor(_sc, cuda=True, retain_tensor=True)  # bool, [K, 3] tensor
+        assert flag_tensor, "Scene coordinates at {:s} cannot be converted into tensor!".format(file_name)
 
-        block_h, block_w = 24, 36
         _sc_split = split_scene_coord(_sc, block_h, block_w)  # [rows, cols, b_h, b_w, 3]
 
         selected_pc_ls = [[[] for _ in range(_sc_split.shape[1])] for _ in range(_sc_split.shape[0])]
@@ -166,8 +170,8 @@ def main():
                 # print('\rSelecting local point cloud, row {:d} col {:d} time: {:.2f}s, #points: {:d}'.format(row, col, time_elapsed, len(selected_pc_ls[row][col])),
                 #       end='', flush=True)
 
-        flag_float16, _sc_split = try_making_float16_tensor(_sc_split, cuda=True, retain_tensor=True)
-        assert flag_float16
+        flag_tensor, _sc_split = convert_to_tensor(_sc_split, cuda=True, retain_tensor=True)
+        assert flag_tensor
 
         semantics_label_ls = [[[] for _ in range(_sc_split.shape[1])] for _ in range(_sc_split.shape[0])]
         for row in range(_sc_split.shape[0]):
