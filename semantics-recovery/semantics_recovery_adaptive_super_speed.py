@@ -50,7 +50,7 @@ def pc_local_search(big_pc: torch.Tensor, ref_patch: torch.Tensor, nodata_value:
 
         if len(selected_pc) == 0:
             selected_pc = torch.empty(0)
-    
+
     return selected_pc
 
 
@@ -77,7 +77,8 @@ def split_scene_coord(sc: np.ndarray, block_h: int, block_w: int) -> np.ndarray:
     return np.array(sc_split)
 
 
-def convert_to_tensor(data: np.ndarray, cuda=False, retain_tensor=False, float16=False) -> Tuple[bool, Union[None, torch.Tensor]]:
+def convert_to_tensor(data: np.ndarray, cuda=False, retain_tensor=False, float16=False) -> Tuple[
+    bool, Union[None, torch.Tensor]]:
     """
     Try making tensor from numpy array.
     """
@@ -126,7 +127,7 @@ def sc_query(sc: torch.Tensor, pc: torch.Tensor, nodata_value: float = -1.0) -> 
 
     cloest_dist, idx_cloest_pt = qeury2pc_dist.min(dim=1)  # [K'] + [K']
 
-    semantics_label = -torch.ones(h*w, 2).to(sc.device)  # [H * W]
+    semantics_label = -torch.ones(h * w, 2).to(sc.device)  # [H * W]
     semantics_label[torch.logical_not(mask_nodata), 0] = pc[idx_cloest_pt, -1].float()
     semantics_label[torch.logical_not(mask_nodata), 1] = cloest_dist.float()
 
@@ -188,11 +189,37 @@ def find_opt_split(_sc: np.ndarray, _big_pc_label_tensor: torch.Tensor,
     return block_h, block_w
 
 
-def main():
+def all_path(dirname: str, filter_list: list) -> list:
+    """
+    extract all the path of .npy file from the main dir
+    :param filter_list:          file format to extract
+    :param dirname:         main dir name
+    :return:                file name list with detailed path
+    """
 
+    file_path_list = []
+
+    for maindir, subdir, file_name_list in os.walk(dirname):
+
+        # # current main dir
+        # print('main dir:', maindir)
+        # # current sub dir
+        # print('sub dir:', subdir)
+        # # all file under current main dir
+        # print('file name list:', file_name_list)
+
+        for filename in file_name_list:
+            if os.path.splitext(filename)[1] in filter_list:
+                path_detail = os.path.join(maindir, '_'.join(filename.split('_')[:-1]))
+                file_path_list.append(path_detail)
+
+    return file_path_list
+
+
+def main():
     args = config_parser()
     downsample_rate = args.downsample_rate
-    max_mem_GB = 31
+    max_mem_GB = 28
 
     # read point cloud with semantic label data from .npy file
     _big_pc_label = np.load("big_pc_label.npy")  # [X, 4]
@@ -204,28 +231,29 @@ def main():
         scale = np.array(interval_xyz / 1.e5, np.float64)  # [3]
     else:
         scale = 1.0
-    print('Offset origin XYZ: {}, {}, {}, scale: {}'.format(*offset_center, scale))
+    # print('Offset origin XYZ: {}, {}, {}, scale: {}'.format(*offset_center, scale))
     _big_pc_label = apply_offset(_big_pc_label, offset_center, scale, nodata_value=None)  # [X, 4]
 
-    flag_tensor, _big_pc_label_tensor = convert_to_tensor(_big_pc_label, cuda=True, retain_tensor=True, float16=args.float16)
+    flag_tensor, _big_pc_label_tensor = convert_to_tensor(_big_pc_label, cuda=True, retain_tensor=True,
+                                                          float16=args.float16)
     assert flag_tensor, "Cannot build tensor for the original data (w/ offset)!"
 
-    file_ls = ['_'.join(item.split('_')[:-1]) for item in os.listdir('scene_coord')]
-    file_ls = np.unique(file_ls).tolist()
-    print(file_ls)
+    file_ls = all_path('/work/topo/VNAV/Synthetic_Data/EPFL/matching', filter_list=['.npy'])
+    # print(file_ls)
 
     for idx_dp, file_name in tqdm(enumerate(file_ls)):
 
         time_start = time.time()
         block_h, block_w = args.block_h, args.block_w
         """Load ray-traced point cloud"""
-        _sc = np.load('scene_coord/{:s}_pc.npy'.format(file_name))  # [480, 720, 3]
-        raw_image = io.imread('scene_coord/{:s}_img.png'.format(file_name))[:, :, :3]
+        _sc = np.load('{:s}_pc.npy'.format(file_name))  # [480, 720, 3]
+        # raw_image = io.imread('scene_coord/{:s}_img.png'.format(file_name))[:, :, :3]
         _sc = _sc[::downsample_rate, ::downsample_rate, :]  # [H, W, 3]
         _sc_raw_size = _sc.shape  # [H, W, 3]
-        _sc = apply_offset(_sc.reshape(-1, 3), offset_center, scale, nodata_value=-1).reshape(_sc_raw_size)  # [H, W, 3], numpy array
+        _sc = apply_offset(_sc.reshape(-1, 3), offset_center, scale, nodata_value=-1).reshape(
+            _sc_raw_size)  # [H, W, 3], numpy array
 
-        block_h, block_w = find_opt_split(_sc, _big_pc_label_tensor, block_h, block_w, max_mem_GB= 5)
+        block_h, block_w = find_opt_split(_sc, _big_pc_label_tensor, block_h, block_w, max_mem_GB)
 
         _sc_split = split_scene_coord(_sc, block_h, block_w)  # [rows, cols, b_h, b_w, 3]
 
@@ -248,7 +276,7 @@ def main():
                     semantic_label = sc_query(_sc_split[row, col], selected_pc, nodata_value=-1.0)
                 else:
                     semantic_label = -np.ones_like(_sc_split[row, col].cpu().float().numpy())[:, :, :2]
-                
+
                 ttl_time_query += time.time() - time_query
 
                 semantics_label_ls[row][col] = semantic_label[:, :, 0]
@@ -260,61 +288,65 @@ def main():
         semantics_label = np.array(semantics_label, np.uint8)
         semantics_distance = np.block(semantics_distance_ls).astype(np.float32)  # [H, W]
         tiem_elapsed = time.time() - time_start
-        print("Semantics label recovery time: {:.1f}s, unique labels: {}".format(tiem_elapsed, np.unique(semantics_label)))
+        print("Semantics label recovery time: {:.1f}s, unique labels: {}".format(tiem_elapsed,
+                                                                                 np.unique(semantics_label)))
         torch.cuda.empty_cache()
 
         """Results saving"""
-        np.save('semantics_label_{:s}'.format(file_name), semantics_label)
-        np.save('semantics_distance_{:s}'.format(file_name), semantics_distance)
+        path = '/home/shanli/semantics-recovery/semantics_label/EPFL/matching/'
+        directory = '/'.join(file_name.split('/')[7:-1])
+        np.save(path + directory + '/semantics_label_{:s}'.format(file_name.split('/')[-1]), semantics_label)
+        np.save(path + directory + '/semantics_label_{:s}'.format(file_name.split('/')[-1]), semantics_distance)
 
-        if args.plot:
-            fig, axes = plt.subplots(1, 3)
-            axes[0].axis('off')
-            axes[0].imshow(raw_image)
-            axes[0].set_title("Image")
+        # if args.plot:
+        #     fig, axes = plt.subplots(1, 3)
+        #     axes[0].axis('off')
+        #     axes[0].imshow(raw_image)
+        #     axes[0].set_title("Image")
+        #
+        #     axes[1].axis('off')
+        #     axes[1].imshow(semantics_label)
+        #     axes[1].set_title("Semantics")
+        #
+        #     axes[2].axis('off')
+        #     im = axes[2].imshow(semantics_distance)
+        #     axes[2].set_title("Cloest point distance")
+        #
+        #     from mpl_toolkits.axes_grid1 import make_axes_locatable
+        #
+        #     divider = make_axes_locatable(axes[2])
+        #     cax = divider.append_axes("right", size="5%", pad=0.05)
+        #
+        #     plt.colorbar(im, cax=cax)
+        #     plt.savefig('semantics_label_{:s}.png'.format(file_name), bbox_inches='tight', dpi=400)
 
-            axes[1].axis('off')
-            axes[1].imshow(semantics_label)
-            axes[1].set_title("Semantics")
-
-            axes[2].axis('off')
-            im = axes[2].imshow(semantics_distance)
-            axes[2].set_title("Cloest point distance")
-
-            from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-            divider = make_axes_locatable(axes[2])
-            cax = divider.append_axes("right", size="5%", pad=0.05)
-
-            plt.colorbar(im, cax=cax)
-            plt.savefig('semantics_label_{:s}.png'.format(file_name), bbox_inches='tight', dpi=400)
-        
 
 def config_parser():
     parser = argparse.ArgumentParser(
-    description='Semantic label recovery script.',
-    formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        description='Semantic label recovery script.',
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     parser.add_argument('--float16', action='store_true',
                         help='Use float16 number to accelerate computation (unstable!)')
 
     parser.add_argument('--downsample_rate', type=int, default=1,
-                    help='Downsampling rate.')
+                        help='Downsampling rate.')
 
     parser.add_argument('--block_h', type=int, default=240,
-                    help='Cell block height.')
+                        help='Cell block height.')
 
     parser.add_argument('--block_w', type=int, default=360,
-                    help='Cell block width.')
+                        help='Cell block width.')
 
     parser.add_argument('--plot', action='store_true',
-                    help='Plot visualized results.')
+                        help='Plot visualized results.')
 
     opt = parser.parse_args()
 
     if opt.float16:
         print("Warning: float16 mode is highly unstable!")
     return opt
+
 
 if __name__ == '__main__':
     main()
