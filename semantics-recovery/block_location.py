@@ -45,7 +45,6 @@ for idx_dp, file_name in enumerate(file_ls):
     nbr_pts_removed = nbr_pts_init - nbr_pts_remain
 
     # recover bool flag for removed data in (480, 720) format
-    # needs to be improved
     flag_removed = np.zeros_like(flag_nodata)
     valdata_slice = flag_removed[flag_nodata]
     valdata_slice[idx] = True
@@ -64,9 +63,9 @@ for idx_dp, file_name in enumerate(file_ls):
              box_points=box_points)
 
 
-    # np.savez(output_path + '/{:s}_output_info.npz'.format(file_name.split('/')[-1]),
-    #          nbr_pts_nodata=nbr_pts_nodata, nbr_pts_removed=nbr_pts_removed,
-    #          box_points=box_points, flag_removed = flag_removed)
+    np.savez(output_path + '/{:s}_output_info.npz'.format(file_name.split('/')[-1]),
+             nbr_pts_nodata=nbr_pts_nodata, nbr_pts_removed=nbr_pts_removed,
+             box_points=box_points, flag_removed = flag_removed)
 
     time_elapsed = time.time() - time_start
     print("Semantics label recovery time: {:.1f}s".format(time_elapsed))
