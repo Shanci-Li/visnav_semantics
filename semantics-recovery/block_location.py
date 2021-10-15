@@ -30,7 +30,7 @@ for idx_dp, file_name in enumerate(file_ls):
     _sc_pts = _sc.reshape(-1, 3)
 
     # remove nodata point
-    flag_nodata = _sc_pts[:, 1] != nodata_value  # [3]
+    flag_nodata = _sc_pts[:, 1] != nodata_value  # [H*W]
     nbr_pts_nodata = sum(flag_nodata != True)
     selected_pts = _sc_pts[flag_nodata]
 
@@ -46,12 +46,11 @@ for idx_dp, file_name in enumerate(file_ls):
 
     # recover bool flag for removed data in (480, 720) format
     # needs to be improved
-
-    # flag_in_PC = [False] * (480 * 720)
-    # for i in idx:
-    #     flag_in_PC[i] = True
-    # flag_removed = [False if flag_nodata[i] == False else flag_in_PC.pop(0) for i in range(480 * 720)]
-    # flag_removed = np.array(flag_removed).reshape(480, 720)
+    flag_removed = np.zeros_like(flag_nodata)
+    valdata_slice = flag_removed[flag_nodata]
+    valdata_slice[idx] = True
+    flag_removed[flag_nodata] = valdata_slice
+    flag_removed = flag_removed.reshape(480, 720)
 
     # calculate the coordinate of the bounding box of the image
     axis_aligned_bounding_box = sc_cleaned.get_axis_aligned_bounding_box()
