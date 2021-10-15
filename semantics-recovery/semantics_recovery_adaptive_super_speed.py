@@ -189,7 +189,7 @@ def find_opt_split(_sc: np.ndarray, _big_pc_label_tensor: torch.Tensor,
     return block_h, block_w
 
 
-def all_path(dirname: str, filter_list: list) -> list:
+def all_path(dirname: str, filter_list: list) -> [list, list]:
     """
     extract all the path of .npy file from the main dir
     :param filter_list:          file format to extract
@@ -198,6 +198,7 @@ def all_path(dirname: str, filter_list: list) -> list:
     """
 
     file_path_list = []
+    folder_path_list =[]
 
     for maindir, subdir, file_name_list in os.walk(dirname):
 
@@ -208,12 +209,31 @@ def all_path(dirname: str, filter_list: list) -> list:
         # # all file under current main dir
         # print('file name list:', file_name_list)
 
+        for dir in subdir:
+            folder_path_list.append(maindir + '/' + dir)
+
         for filename in file_name_list:
+            if 'poses' in os.path.splitext(filename)[0].split('_'):
+                continue
+
             if os.path.splitext(filename)[1] in filter_list:
                 path_detail = os.path.join(maindir, '_'.join(filename.split('_')[:-1]))
                 file_path_list.append(path_detail)
 
-    return file_path_list
+    return file_path_list, folder_path_list
+
+
+def mkdir(output_path, folder_ls) -> None:
+    '''
+    create folder as the structure of input path
+    :param output_path:
+    :param folder_ls:
+    :return:
+    '''
+    for folder in folder_ls:
+        output_folder = os.path.exists(output_path + '/' + folder)
+        if not output_folder:
+            os.makedirs(output_path + '/' + folder)
 
 
 def main():
@@ -238,7 +258,16 @@ def main():
                                                           float16=args.float16)
     assert flag_tensor, "Cannot build tensor for the original data (w/ offset)!"
 
-    file_ls = all_path('/work/topo/VNAV/Synthetic_Data/EPFL/matching', filter_list=['.npy'])
+    input_path = '/work/topo/VNAV/Synthetic_Data/EPFL/matching'
+    output_path = '/home/shanli/semantics-recovery/semantics_label/EPFL/matching/'
+    file_ls, folder_ls = all_path(input_path, filter_list=['.npy'])
+
+    # create output folder structure
+    input_path_len = len(input_path.split('/'))
+    folder_ls = ['/'.join(folder.split('/')[input_path_len:]) for folder in folder_ls]
+    folder_ls = np.unique(folder_ls).tolist()
+    mkdir(output_path, folder_ls)
+
     # print(file_ls)
 
     for idx_dp, file_name in tqdm(enumerate(file_ls)):
@@ -293,10 +322,9 @@ def main():
         torch.cuda.empty_cache()
 
         """Results saving"""
-        path = '/home/shanli/semantics-recovery/semantics_label/EPFL/matching/'
-        directory = '/'.join(file_name.split('/')[7:-1])
-        np.save(path + directory + '/semantics_label_{:s}'.format(file_name.split('/')[-1]), semantics_label)
-        np.save(path + directory + '/semantics_label_{:s}'.format(file_name.split('/')[-1]), semantics_distance)
+        path = output_path + '/semantics_label_{:s}'.format('/'.join(file_name.split('/')[input_path_len:]))
+        np.save(path, semantics_label)
+        np.save(path, semantics_distance)
 
         # if args.plot:
         #     fig, axes = plt.subplots(1, 3)

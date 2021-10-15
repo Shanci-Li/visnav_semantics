@@ -56,7 +56,7 @@ for idx_dp, file_name in enumerate(file_ls):
     print('axis_aligned_bounding_box: {}'.format(box_points))
     nbr_pts_init = len(sc_pc.points)
 
-    sc_cleaned, idx = sc_pc.remove_statistical_outlier(100, 10)
+    sc_cleaned, idx = sc_pc.remove_statistical_outlier(100, 8)
     nbr_pts_remain = len(sc_cleaned.points)
     print('{} points at begining'.format(nbr_pts_init))
     print('{} points after cleaning:'.format(nbr_pts_remain))
