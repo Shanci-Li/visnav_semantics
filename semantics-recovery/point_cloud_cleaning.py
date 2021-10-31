@@ -12,15 +12,10 @@ def mkdir(output_path, folder_ls):
 
 def main():
     # initialization
-    _big_pc_label = np.load("big_pc_label.npy")  # [X, 4]
-    bound_xyz_min = _big_pc_label[:, :3].min(axis=0)  # [3]
-    bound_xyz_max = _big_pc_label[:, :3].max(axis=0)  # [3]
-    offset_center = (bound_xyz_max + bound_xyz_min) / 2  # [3]
-    interval_xyz = bound_xyz_max - bound_xyz_min  # [3]
-    scale = 1.0
+
     nodata_value = -1.0
     input_path = '/media/shanci/Samsung_T5/TOPO_datasets/EPFL'
-    output_path = '/media/shanci/Samsung_T5/processing_data/EPFL'
+    output_path = '/media/shanci/Samsung_T5/processing_data/EPFL_no_data_cleaning'
     file_ls, folder_ls = all_path(input_path, filter_list=['.npy'])
 
     # create output folder structure
@@ -29,14 +24,12 @@ def main():
     folder_ls = np.unique(folder_ls).tolist()
     mkdir(output_path, folder_ls)
 
-    for idx_dp, file_name in tqdm(enumerate(file_ls), desc='data cleaning'):
+    for idx_dp, file_name in tqdm(enumerate(file_ls[:2000]), desc='data cleaning'):
         # time_start = time.time()
         # load npy data
         _sc = np.load('{:s}_pc.npy'.format(file_name))  # [480, 720, 3]
         # label = np.load(input_path + '/semantics_label_{:s}.npy'.format(file_name.split('/')[-1]))  # [480, 720, 3]
         _sc_raw_size = _sc.shape  # [H, W, 3]
-        _sc = apply_offset(_sc.reshape(-1, 3), offset_center, scale, nodata_value=-1).reshape(
-            _sc_raw_size)  # [H, W, 3], numpy array
         _sc_pts = _sc.reshape(-1, 3)
 
         # remove nodata point
@@ -49,28 +42,30 @@ def main():
         sc_pc = o3d.geometry.PointCloud(points=selected_pts)
         nbr_pts_init = len(sc_pc.points)
 
-        # clean the data by remove statistical outlier
-        sc_cleaned, idx = sc_pc.remove_statistical_outlier(100, 10)
-        nbr_pts_remain = len(sc_cleaned.points)
-        nbr_pts_removed = nbr_pts_init - nbr_pts_remain
+        # # clean the data by remove statistical outlier
+        # sc_cleaned, idx = sc_pc.remove_statistical_outlier(100, 10)
+        # nbr_pts_remain = len(sc_cleaned.points)
+        # nbr_pts_removed = nbr_pts_init - nbr_pts_remain
 
-        # recover bool flag for removed data in (480, 720) format
-        flag_removed = np.zeros_like(flag_nodata)
-        valdata_slice = flag_removed[flag_nodata]
-        valdata_slice[idx] = True
-        flag_removed[flag_nodata] = valdata_slice
-        flag_removed = flag_removed.reshape(480, 720)
+        # # recover bool flag for removed data in (480, 720) format
+        # flag_removed = np.zeros_like(flag_nodata)
+        # valdata_slice = flag_removed[flag_nodata]
+        # valdata_slice[idx] = True
+        # flag_removed[flag_nodata] = valdata_slice
+        # flag_removed = flag_removed.reshape(480, 720)
 
         # calculate the coordinate of the bounding box of the image
-        axis_aligned_bounding_box = sc_cleaned.get_axis_aligned_bounding_box()
+        # axis_aligned_bounding_box = sc_cleaned.get_axis_aligned_bounding_box()
+        axis_aligned_bounding_box = sc_pc.get_axis_aligned_bounding_box()
         box_points = axis_aligned_bounding_box.get_box_points()
         box_points = np.asarray(box_points)
         # print('axis_aligned_bounding_box: {}'.format(box_points))
 
         # save processing data
         path = output_path + '/' +'{:s}_output_info.npz'.format('/'.join(file_name.split('/')[input_path_len:]))
-        np.savez(path, nbr_pts_nodata=nbr_pts_nodata, nbr_pts_removed=nbr_pts_removed,
-                 box_points=box_points, flag_removed=flag_removed)
+        np.savez(path, nbr_pts_nodata=nbr_pts_nodata, box_points=box_points)
+        # np.savez(path, nbr_pts_nodata=nbr_pts_nodata, nbr_pts_removed=nbr_pts_removed,
+        #          box_points=box_points, flag_removed=flag_removed)
 
         # time_elapsed = time.time() - time_start
         # print("block location time: {:.1f}s".format(time_elapsed))

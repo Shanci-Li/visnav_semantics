@@ -30,7 +30,7 @@ offset_center = (bound_xyz_max + bound_xyz_min) / 2  # [3]
 interval_xyz = bound_xyz_max - bound_xyz_min  # [3]
 scale = 1.0
 nodata_value = -1.0
-file_ls = all_path('scene_coord', filter_list=['.png'])
+file_ls, folder_ls = all_path('scene_coord', filter_list=['.png'])
 app = gui.Application.instance
 app.initialize()
 
