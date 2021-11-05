@@ -1,10 +1,3 @@
-"""
-Time:     2020/11/30 下午5:02
-Author:   Ding Cheng(Deeachain)
-File:     utils.py
-Describe: Write during my study in Nanjing University of Information and Secience Technology
-Github:   https://github.com/Deeachain
-"""
 import os
 import random
 import numpy as np
@@ -51,17 +44,27 @@ def save_predict(args, output, gt, img_name, save_path):
     image = os.path.join(args.img_path, 'rgb/{:s}.png'.format(img_name))
     raw_image = io.imread(image)[:, :, :3]
 
+    classes_ls = [0, 1, 1, 2, 4, 5, 3]  # put the most important classes in the end to highlight
+
+    output_ = output.copy()
+    for idx, class_id in enumerate(classes_ls):
+        output[output_ == class_id] = int((idx / len(classes_ls)) * 255)
+
+    gt_ = gt.copy()
+    for idx, class_id in enumerate(classes_ls):
+        gt[gt_ == class_id] = int((idx / len(classes_ls)) * 255)
+
     fig, axes = plt.subplots(1, 3)
     axes[0].axis('off')
     axes[0].imshow(raw_image)
     axes[0].set_title("Image")
 
     axes[1].axis('off')
-    axes[1].imshow(output)
+    axes[1].imshow(output, vmin=0, vmax=255)
     axes[1].set_title("Prediction")
 
     axes[2].axis('off')
-    im = axes[2].imshow(gt)
+    im = axes[2].imshow(gt, vmin=0, vmax=255)
     axes[2].set_title("Ground Truth")
 
     divider = make_axes_locatable(axes[2])
@@ -69,6 +72,7 @@ def save_predict(args, output, gt, img_name, save_path):
 
     plt.colorbar(im, cax=cax)
     plt.savefig(os.path.join(save_path, img_name + '.png'), bbox_inches='tight', dpi=400)
+    plt.close()
 
 
 def netParams(model):

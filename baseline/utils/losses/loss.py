@@ -2,9 +2,8 @@ import torch
 import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
-from utils.losses.lovasz_losses import lovasz_softmax
 from torch.nn.modules.loss import _Loss, _WeightedLoss
-from torch.nn import NLLLoss2d
+from kornia.losses import dice_loss
 from collections import OrderedDict
 
 __all__ = ["CrossEntropyLoss2d", "CrossEntropyLoss2dLabelSmooth",
@@ -101,6 +100,24 @@ class CrossEntropyLoss2d(_WeightedLoss):
         :return: scalar
         """
         return self.nll_loss(output, target)
+
+
+class DiceLoss(_WeightedLoss):
+    """
+    Standard pytorch weighted nn.CrossEntropyLoss
+    """
+
+    def __init__(self):
+        super(DiceLoss, self).__init__()
+
+    def forward(self, output, target):
+        """
+        Forward pass
+        :param output: torch.tensor (NxC)
+        :param target: torch.tensor (N)
+        :return: scalar
+        """
+        return dice_loss(output, target)
 
 
 class CrossEntropyLoss2dLabelSmooth(_WeightedLoss):

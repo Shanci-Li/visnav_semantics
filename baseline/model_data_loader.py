@@ -1,10 +1,11 @@
 import os
-import math
 import torch
 import numpy as np
 import torch.utils.model_zoo as model_zoo
 
-from model.Resnet18 import Resnet18
+from PIL import Image
+from torch.utils.data import Dataset
+from torchvision import transforms as T
 from model.SegNet import SegNet
 from model.FCN8s import FCN
 from model.BiSeNet import BiSeNet
@@ -14,6 +15,7 @@ from model.DeeplabV3Plus import Deeplabv3plus_res50
 from model.FCN_ResNet import FCN_ResNet
 from model.DDRNet import DDRNet
 from model.HRNet import HighResolutionNet
+from model.UNet import UNet
 
 
 model_urls = {
@@ -25,19 +27,15 @@ model_urls = {
 }
 
 
-
-from PIL import Image
-from torch.utils.data import Dataset
-from torchvision import transforms as T
-
 class SenmanticData(Dataset):
-    def __init__(self, dir_path):
+    def __init__(self, dir_path, normalization=False):
         """
         Args:
             data_path (string): path to file
             transform: pytorch transforms for transforms and tensor conversion
         """
         # Transforms
+        self.normal = normalization
         self.to_tensor = T.ToTensor()
         # Read the file
         self.img_path = dir_path + '/rgb'
@@ -46,49 +44,44 @@ class SenmanticData(Dataset):
         self.file_ls = [file.split('.')[0] for file in self.file_ls]
         # Calculate len
         self.data_len = len(self.file_ls)
+        if self.normal:
+            # normalize
+            normalize = T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            self.transforms = T.Compose([
+                # T.RandomResizedCrop(224),
+                # T.RandomHorizontalFlip(),
+                normalize
+            ])
+
 
     def convert_label(self, tensor):
         new_tensor = torch.zeros(tensor.shape)
         new_tensor[tensor == 1] = 1
-        new_tensor[tensor == 2] = 2
-        new_tensor[tensor == 3] = 3
-        new_tensor[tensor == 6] = 4
-        new_tensor[tensor == 9] = 5
-        new_tensor[tensor == 17] = 6
+        new_tensor[tensor == 2] = 1
+        new_tensor[tensor == 3] = 2
+        new_tensor[tensor == 6] = 3
+        new_tensor[tensor == 9] = 4
+        new_tensor[tensor == 17] = 5
         return new_tensor
 
     def __getitem__(self, index):
         # Get image name from the pandas df
         image_path = self.img_path + '/' + self.file_ls[index] + '.png'
-        label_path = self.label_path + '/' + self.file_ls[index] + '.dat'
+        label_path = self.label_path + '/' + self.file_ls[index] + '.npy'
         # Open image
         img_npy = np.array(Image.open(image_path))[:, :, :3]
         # Transform image to tensor
         img_tensor = self.to_tensor(img_npy)
+        if self.normal:   
+            img_tensor = self.transforms(img_tensor)
         # read semantic label
-        label = self.convert_label(torch.load(label_path))
+        label = self.convert_label(np.load(label_path))
         name = self.file_ls[index]
 
         return img_tensor, label, name
 
     def __len__(self):
         return self.data_len
-
-
-def build_dataset_train(root, dataset):
-    data_dir = os.path.join(root, dataset)
-    train_data_list = os.path.join(data_dir, dataset + '_' + 'train_list.txt')
-    inform_data_file = os.path.join('./dataset/inform/', dataset + '_inform.pkl')
-
-    return
-
-
-def build_dataset_test(root, dataset, crop_size, mode='whole', gt=False):
-    data_dir = os.path.join(root, dataset)
-    inform_data_file = os.path.join('./dataset/inform/', dataset + '_inform.pkl')
-    train_data_list = os.path.join(data_dir, dataset + '_train_list.txt')
-
-    return
 
 
 def build_model(model_name, num_classes, backbone='resnet50', pretrained=False, out_stride=32, mult_grid=False):

@@ -1,12 +1,14 @@
+import os
+import sys
 import numpy as np
 import torch
 from prettytable import PrettyTable
 import torch.nn.functional as F
 from math import ceil
 from tqdm import tqdm
-from utils.utils import save_predict
-from utils.metric.SegmentationMetric import SegmentationMetric
 
+from baseline.utils.utils import save_predict
+from baseline.utils.metric.SegmentationMetric import SegmentationMetric
 
 def eval_metric(args, class_dict_df, metric, count_loss, loss):
     loss /= count_loss
@@ -215,7 +217,13 @@ def predict_multiscale_sliding(args, model, class_dict_df, testLoader, scales, o
 
             gt = np.asarray(gt.cpu(), dtype=np.uint8)
             full_prob = torch.argmax(full_prob, 1).long()
-            full_prob = np.asarray(full_prob.cpu(), dtype=np.uint8)  # (B,C,H,W)
+            if args.loss == 'dice_loss':
+                full_prob = F.one_hot(full_prob[0], args.classes)
+                full_prob = np.asarray(full_prob.cpu(), dtype=np.uint8)  # (B,C,H,W)
+                full_prob = full_prob.transpose(2, 0, 1)
+                print(full_prob.shape)
+            else:
+                full_prob = np.asarray(full_prob.cpu(), dtype=np.uint8)  # (B,C,H,W)
 
             '''Sets the color of the output image and predict image to be grayscale or color'''
             for index in range(full_prob.shape[0]):  # full_prob shape[0] is batch_size

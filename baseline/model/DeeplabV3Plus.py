@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.utils.model_zoo as model_zoo
-from model.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
+from baseline.model.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 from torchsummary import summary
 
 model_urls = {

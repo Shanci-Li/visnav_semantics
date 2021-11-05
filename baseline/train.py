@@ -2,21 +2,22 @@ import os
 import sys
 import torch
 import time
-from argparse import ArgumentParser
+import warnings
+
+import pandas as pd
+import torch.nn.functional as F
 from tqdm import tqdm
 from torch.utils import data
+from argparse import ArgumentParser
 from builders.model_builder import build_model
 from builders.validation_builder import predict_multiscale_sliding
-from utils.utils import setup_seed, netParams
-from utils.plot_log import draw_log
-from utils.record_log import record_log
-from utils.earlyStopping import EarlyStopping
-from utils.losses.loss import CrossEntropyLoss2d
-import warnings
+from baseline.utils.utils import setup_seed, netParams
+from baseline.utils.plot_log import draw_log
+from baseline.utils.record_log import record_log
+from baseline.utils.earlyStopping import EarlyStopping
+from baseline.utils.losses.loss import CrossEntropyLoss2d, FocalLoss2d, DiceLoss
 from torch.optim.lr_scheduler import MultiStepLR
-from utlis import SenmanticData
-import pandas as pd
-
+from model_data_loader import SenmanticData
 
 warnings.filterwarnings('ignore')
 
@@ -35,7 +36,7 @@ def train(args, train_loader, model, criterion, optimizer, epoch, device):
        device      : cuda
     return: average loss, lr
     """
-    model = model.to(device)
+
     model.train()
     epoch_loss = []
 
@@ -56,6 +57,8 @@ def train(args, train_loader, model, criterion, optimizer, epoch, device):
         labels = labels.to(device).long()
         output = model(images)
 
+        if args.loss == 'dice_loss':
+            output = F.one_hot(output, args.classes)
         loss = criterion(output, labels)
         loss.backward()
         optimizer.step()
@@ -82,19 +85,24 @@ def main(args):
     model = build_model(args.model, args.classes, args.backbone, args.pretrained, args.out_stride, args.mult_grid)
 
     # define loss function, respectively
-    criterion = CrossEntropyLoss2d()
+
+    # Default uses cross quotient loss function
+    if args.loss == 'CrossEntropyLoss2d':
+        criterion = CrossEntropyLoss2d()
+    elif args.loss == 'DiceLoss':
+        criterion = DiceLoss()
+    elif args.loss == 'FocalLoss2d':
+        criterion = FocalLoss2d()
 
     # load train set
-    train_set = SenmanticData('./datasets/EPFL/train_sim')
-    val_set = SenmanticData('./datasets/EPFL/val_sim')
-    test_set = SenmanticData('./datasets/EPFL/test_real')
-
-
+    train_set = SenmanticData('./datasets/' + args.dataset + '/train_sim', normalization=args.normalization)
+    val_set = SenmanticData('./datasets/' + args.dataset + '/val_sim', normalization=args.normalization)
+    test_set = SenmanticData('./datasets/' + args.dataset + '/test_real', normalization=args.normalization)
 
     # move model and criterion on cuda
     if args.cuda:
         device = torch.device("cuda:0" if torch.cuda.is_available() else RuntimeError)
-
+        model = model.to(device)
         trainLoader = data.DataLoader(train_set, batch_size=args.batch_size,
                                      shuffle=True, num_workers=args.batch_size, pin_memory=True, drop_last=False)
         valLoader = data.DataLoader(val_set, batch_size=args.batch_size,
@@ -114,10 +122,15 @@ def main(args):
     elif args.optim == 'adamw':
         optimizer = torch.optim.AdamW(parameters, lr=args.lr, weight_decay=5e-4)
 
-    scheduler = MultiStepLR(optimizer, milestones=[10, 20], gamma=0.2)
+    scheduler = MultiStepLR(optimizer, milestones=[10, 20, 25, 30, 40], gamma=0.5)
 
     # initial log file val output save
-    args.savedir = (args.savedir + '/' + args.model + '/')
+    if args.normalization:
+        dir_normal = 'normalized'
+    else:
+        dir_normal = 'not_normalized'
+
+    args.savedir = os.path.join(args.savedir, args.dataset, args.model, args.loss, dir_normal)
     if not os.path.exists(args.savedir) and args.local_rank == 0:
         os.makedirs(args.savedir)
 
@@ -128,9 +141,8 @@ def main(args):
 
     recorder = record_log(args)
 
-    class_name = ['No data', 'Unclassified and temporary objects', 'Ground', 'Vegetation', 'Buildings', 'Water',
-                  'Bridges']
-    label_index = [0, 1, 2, 3, 4, 5, 6]
+    class_name = ['No data', 'Ground', 'Vegetation', 'Buildings', 'Water', 'Bridges']
+    label_index = [0, 1, 2, 3, 4, 5]
     class_dict_df = pd.DataFrame([class_name, label_index], index=['class_name', 'label_index']).T
     class_dict_df = class_dict_df.set_index('label_index')
 
@@ -149,11 +161,40 @@ def main(args):
     Miou = 0
     Best_Miou = 0
     # continue training
+    if args.resume:
+        logger, lines = recorder.resume_logfile()
+        for index, line in enumerate(lines):
+            lossTr_list.append(float(line.strip().split()[2]))
+            if len(line.strip().split()) != 3:
+                epoch_list.append(int(line.strip().split()[0]))
+                lossVal_list.append(float(line.strip().split()[3]))
+                Miou_list.append(float(line.strip().split()[5]))
 
-    logger = recorder.initial_logfile()
-    logger.flush()
+        if os.path.isfile(args.resume):
+            checkpoint = torch.load(args.resume, map_location='cuda')
+            start_epoch = checkpoint['epoch'] + 1
+            check_list = [i for i in checkpoint['model'].items()]
+            # Read weights with multiple cards, and continue training with a single card this time
+            if 'module.' in check_list[0][0]:
+                new_stat_dict = {}
+                for k, v in checkpoint['model'].items():
+                    new_stat_dict[k[:]] = v
+                model.load_state_dict(new_stat_dict, strict=True)
+            # Read the training weight of a single card, and continue training with a single card this time
+            else:
+                model.load_state_dict(checkpoint['model'])
 
-    # for epoch in range(start_epoch, args.max_epochs + 1):
+            optimizer.load_state_dict(checkpoint['optimizer'])
+
+            if args.local_rank == 0:
+                print("loaded checkpoint '{}' (epoch {})".format(args.resume, checkpoint['epoch']))
+        else:
+            if args.local_rank == 0:
+                print("no checkpoint found at '{}'".format(args.resume))
+    else:
+        logger = recorder.initial_logfile()
+        logger.flush()
+
     for epoch in range(start_epoch, args.max_epochs + 1):
         start_time = time.time()
         # training
@@ -163,6 +204,15 @@ def main(args):
         scheduler.step()
         if args.local_rank == 0:
             lossTr_list.append(lossTr)
+
+        # save the checkpoints
+        model_file_name = args.savedir + '/checkpoint_epoch_{}.pth'.format(epoch)
+        state = {
+            "epoch": epoch,
+            "model": model.state_dict(),
+            'optimizer': optimizer.state_dict()
+        }
+        torch.save(state, model_file_name)
 
         train_end = time.time()
         train_per_epoch_seconds = train_end - train_start
@@ -251,8 +301,12 @@ def parse_args():
     # model and dataset
     parser.add_argument('--model', type=str, default="Deeplabv3plus_res50", help="model name")
     parser.add_argument('--backbone', type=str, default="resnet50", help="backbone name")
+    parser.add_argument('--dataset', type=str, default="EPFL", choices=['EPFL', 'comballaz'],
+                        help="dataset to train: EPFL or comballaz")
     parser.add_argument('--pretrained', type=bool, default=True,
                         help="whether choice backbone pretrained on imagenet")
+    parser.add_argument('--normalization', type=bool, default=True,
+                        help="whether normalize the input image")
     parser.add_argument('--img_path', type=str, default='./datasets/EPFL/val_sim',
                         help="Directory where the raw images are in")
     parser.add_argument('--out_stride', type=int, default=16, help="output stride of backbone")
@@ -274,20 +328,20 @@ def parse_args():
                         help=" the tile_size is when evaluating or testing")
     parser.add_argument('--flip_merge', action='store_true', help="Defalut use predict without flip_merge")
     parser.add_argument('--loss', type=str, default="CrossEntropyLoss2d",
-                        choices=['CrossEntropyLoss2d', 'ProbOhemCrossEntropy2d',
-                                 'CrossEntropyLoss2dLabelSmooth', 'LovaszSoftmax',
-                                 'FocalLoss2d'],
+                        choices=['CrossEntropyLoss2d', 'DiceLoss', 'FocalLoss2d'],
                         help="choice loss for train or val in list")
     # cuda setting
     parser.add_argument('--cuda', type=bool, default=True, help="running on CPU or GPU")
     parser.add_argument('--local_rank', type=int, default=0)
     parser.add_argument('--gpus_id', type=str, default="0", help="default GPU devices 0")
     # checkpoint and log
-    parser.add_argument('--resume', type=str, default=None,
+    parser.add_argument('--resume', type=str,
+                        default='/media/shanci/Samsung_T5/checkpoint/Deeplabv3plus_res50/CrossEntropyLoss2d/best_model.pth',
                         help="use this file to load last checkpoint for continuing training")
-    parser.add_argument('--savedir', default="./checkpoint/", help="directory to save the model snapshot")
+    parser.add_argument('--savedir', default="/media/shanci/Samsung_T5/checkpoint/",
+                        help="directory to save the model snapshot")
     parser.add_argument('--logFile', default="log.txt", help="storing the training and validation logs")
-    parser.add_argument('--classes', default=7, help="number of classes")
+    parser.add_argument('--classes', default=6, help="number of classes")
     args = parser.parse_args()
 
     return args

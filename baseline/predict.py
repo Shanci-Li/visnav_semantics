@@ -1,12 +1,13 @@
 import os
 import torch
+import pandas as pd
 import torch.backends.cudnn as cudnn
 from torch.utils import data
 from argparse import ArgumentParser
 from prettytable import PrettyTable
 from builders.model_builder import build_model
-from builders.dataset_builder import build_dataset_test
-from builders.loss_builder import build_loss
+from baseline.utils.losses.loss import CrossEntropyLoss2d
+from model_data_loader import SenmanticData
 from builders.validation_builder import predict_multiscale_sliding
 
 
@@ -21,17 +22,20 @@ def main(args):
         t.add_row([k, vars(args)[k]])
     print(t.get_string(title="Predict Arguments"))
 
+    class_name = ['No data', 'Unclassified and temporary objects', 'Ground', 'Vegetation', 'Buildings', 'Water',
+                  'Bridges']
+    label_index = [0, 1, 2, 3, 4, 5, 6]
+    class_dict_df = pd.DataFrame([class_name, label_index], index=['class_name', 'label_index']).T
+    class_dict_df = class_dict_df.set_index('label_index')
+
     # build the model
     model = build_model(args.model, args.classes, args.backbone, args.pretrained, args.out_stride, args.mult_grid)
 
     # load the test set
-    if args.predict_type == 'validation':
-        testdataset, class_dict_df = build_dataset_test(args.root, args.dataset, args.crop_size,
-                                                        mode=args.predict_mode, gt=True)
-    else:
-        testdataset, class_dict_df = build_dataset_test(args.root, args.dataset, args.crop_size,
-                                                        mode=args.predict_mode, gt=False)
-    DataLoader = data.DataLoader(testdataset, batch_size=args.batch_size,
+
+    test_set = SenmanticData('./datasets/EPFL/test_real')
+
+    DataLoader = data.DataLoader(test_set, batch_size=args.batch_size,
                 shuffle=False, num_workers=args.batch_size, pin_memory=True, drop_last=False)
 
     if args.cuda:
@@ -49,7 +53,7 @@ def main(args):
             checkpoint = torch.load(args.checkpoint)['model']
             check_list = [i for i in checkpoint.items()]
             # Read weights with multiple cards, and continue training with a single card this time
-            if 'module.' in check_list[0][0]:  # 读取使用多卡训练权重,并且此次使用单卡预测
+            if 'module.' in check_list[0][0]:
                 new_stat_dict = {}
                 for k, v in checkpoint.items():
                     new_stat_dict[k[7:]] = v
@@ -62,7 +66,7 @@ def main(args):
             raise FileNotFoundError("no checkpoint found at '{}'".format(args.checkpoint))
 
     # define loss function
-    criterion = build_loss(args, None, 255)
+    criterion = CrossEntropyLoss2d()
     print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n"
           ">>>>>>>>>>>  beginning testing   >>>>>>>>>>>>\n"
           ">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>")
@@ -73,32 +77,30 @@ def main(args):
 
 if __name__ == '__main__':
     parser = ArgumentParser()
-    parser.add_argument('--model', default="UNet", help="model name")
-    parser.add_argument('--backbone', type=str, default="resnet18", help="backbone name")
+    parser.add_argument('--model', default="Deeplabv3plus_res50", help="model name")
+    parser.add_argument('--backbone', type=str, default="resnet50", help="backbone name")
     parser.add_argument('--pretrained', action='store_true',
                         help="whether choice backbone pretrained on imagenet")
-    parser.add_argument('--out_stride', type=int, default=32, help="output stride of backbone")
+    parser.add_argument('--out_stride', type=int, default=16, help="output stride of backbone")
     parser.add_argument('--mult_grid', action='store_true',
                         help="whether choice mult_grid in backbone last layer")
     parser.add_argument('--root', type=str, default="", help="path of datasets")
-    parser.add_argument('--predict_mode', default="sliding", choices=["sliding", "whole"],
-                        help="Defalut use whole predict mode")
     parser.add_argument('--predict_type', default="validation", choices=["validation", "predict"],
                         help="Defalut use validation type")
     parser.add_argument('--flip_merge', action='store_true', help="Defalut use predict without flip_merge")
     parser.add_argument('--scales', type=float, nargs='+', default=[1.0], help="predict with multi_scales")
     parser.add_argument('--overlap', type=float, default=0.0, help="sliding predict overlap rate")
-    parser.add_argument('--dataset', default="paris", help="dataset: cityscapes")
     parser.add_argument('--num_workers', type=int, default=4, help="the number of parallel threads")
     parser.add_argument('--batch_size', type=int, default=1,
                         help=" the batch_size is set to 1 when evaluating or testing NOTES:image size should fixed!")
-    parser.add_argument('--tile_hw_size', type=str, default='512, 512',
+    parser.add_argument('--tile_hw_size', type=str, default='480, 720',
                         help=" the tile_size is when evaluating or testing")
-    parser.add_argument('--crop_size', type=int, default=769, help="crop size of image")
-    parser.add_argument('--input_size', type=str, default=(769, 769),
+    parser.add_argument('--input_size', type=str, default=(480, 720),
                         help=" the input_size is for build ProbOhemCrossEntropy2d loss")
-    parser.add_argument('--checkpoint', type=str, default='',
+    parser.add_argument('--checkpoint', type=str, default='/media/shanci/Samsung_T5/checkpoint/Deeplabv3plus_res50/CrossEntropyLoss2d/best_model.pth',
                         help="use the file to load the checkpoint for evaluating or testing ")
+    parser.add_argument('--img_path', type=str, default='./datasets/EPFL/test_real',
+                        help="Directory where the raw images are in")
     parser.add_argument('--save_seg_dir', type=str, default="./outputs/",
                         help="saving path of prediction result")
     parser.add_argument('--loss', type=str, default="CrossEntropyLoss2d",
@@ -107,16 +109,11 @@ if __name__ == '__main__':
     parser.add_argument('--cuda', default=True, help="run on CPU or GPU")
     parser.add_argument("--gpus", default="0", type=str, help="gpu ids (default: 0)")
     parser.add_argument('--local_rank', type=int, default=0)
+    parser.add_argument('--classes', default=7, help="number of classes")
     args = parser.parse_args()
 
     save_dirname = args.checkpoint.split('/')[-2] + '_' + args.checkpoint.split('/')[-1].split('.')[0]
 
-    args.save_seg_dir = os.path.join(args.save_seg_dir, args.dataset, args.predict_mode, save_dirname)
-
-    if args.dataset == 'cityscapes':
-        args.classes = 19
-    else:
-        raise NotImplementedError(
-            "This repository now supports datasets %s is not included" % args.dataset)
+    args.save_seg_dir = os.path.join(args.save_seg_dir, save_dirname)
 
     main(args)
