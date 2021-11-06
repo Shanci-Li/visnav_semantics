@@ -1,16 +1,16 @@
 import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 from collections import OrderedDict
-from model.Resnet18 import Resnet18
-from model.SegNet import SegNet
-from model.FCN8s import FCN
-from model.BiSeNet import BiSeNet
-from model.BiSeNetV2 import BiSeNetV2
-from model.PSPNet.pspnet import PSPNet
-from model.DeeplabV3Plus import Deeplabv3plus_res50
-from model.FCN_ResNet import FCN_ResNet
-from model.DDRNet import DDRNet
-from model.HRNet import HighResolutionNet
+from baseline.model.SegNet import SegNet
+from baseline.model.FCN8s import FCN
+from baseline.model.UNet import UNet
+from baseline.model.BiSeNet import BiSeNet
+from baseline.model.BiSeNetV2 import BiSeNetV2
+from baseline.model.PSPNet.pspnet import PSPNet
+from baseline.model.DeeplabV3Plus import Deeplabv3plus_res50
+from baseline.model.FCN_ResNet import FCN_ResNet
+from baseline.model.DDRNet import DDRNet
+from baseline.model.HRNet import HighResolutionNet
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -28,8 +28,8 @@ def build_model(model_name, num_classes, backbone='resnet50', pretrained=False, 
         model = FCN_ResNet(num_classes=num_classes, backbone=backbone, out_stride=out_stride, mult_grid=mult_grid)
     elif model_name == 'SegNet':
         model = SegNet(classes=num_classes)
-    elif model_name == 'Resnet18':
-        model = Resnet18(num_classes)
+    elif model_name == 'Unet':
+        model = UNet(num_classes)
     elif model_name == 'BiSeNet':
         model = BiSeNet(num_classes=num_classes, backbone=backbone)
     elif model_name == 'BiSeNetV2':

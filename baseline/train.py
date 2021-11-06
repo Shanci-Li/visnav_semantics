@@ -85,7 +85,6 @@ def main(args):
     model = build_model(args.model, args.classes, args.backbone, args.pretrained, args.out_stride, args.mult_grid)
 
     # define loss function, respectively
-
     # Default uses cross quotient loss function
     if args.loss == 'CrossEntropyLoss2d':
         criterion = CrossEntropyLoss2d()
@@ -97,7 +96,7 @@ def main(args):
     # load train set
     train_set = SenmanticData('./datasets/' + args.dataset + '/train_sim', normalization=args.normalization)
     val_set = SenmanticData('./datasets/' + args.dataset + '/val_sim', normalization=args.normalization)
-    test_set = SenmanticData('./datasets/' + args.dataset + '/test_real', normalization=args.normalization)
+    test_set = SenmanticData('./datasets/' + args.dataset + '/train_drone_real', normalization=args.normalization)
 
     # move model and criterion on cuda
     if args.cuda:
@@ -141,7 +140,7 @@ def main(args):
 
     recorder = record_log(args)
 
-    class_name = ['No data', 'Ground', 'Vegetation', 'Buildings', 'Water', 'Bridges']
+    class_name = ['Sky', 'Ground', 'Vegetation', 'Buildings', 'Water', 'Bridges']
     label_index = [0, 1, 2, 3, 4, 5]
     class_dict_df = pd.DataFrame([class_name, label_index], index=['class_name', 'label_index']).T
     class_dict_df = class_dict_df.set_index('label_index')
@@ -305,7 +304,7 @@ def parse_args():
                         help="dataset to train: EPFL or comballaz")
     parser.add_argument('--pretrained', type=bool, default=True,
                         help="whether choice backbone pretrained on imagenet")
-    parser.add_argument('--normalization', type=bool, default=True,
+    parser.add_argument('--normalization', type=bool, default=False,
                         help="whether normalize the input image")
     parser.add_argument('--img_path', type=str, default='./datasets/EPFL/val_sim',
                         help="Directory where the raw images are in")
@@ -336,7 +335,7 @@ def parse_args():
     parser.add_argument('--gpus_id', type=str, default="0", help="default GPU devices 0")
     # checkpoint and log
     parser.add_argument('--resume', type=str,
-                        default='/media/shanci/Samsung_T5/checkpoint/Deeplabv3plus_res50/CrossEntropyLoss2d/best_model.pth',
+                        default=None,
                         help="use this file to load last checkpoint for continuing training")
     parser.add_argument('--savedir', default="/media/shanci/Samsung_T5/checkpoint/",
                         help="directory to save the model snapshot")

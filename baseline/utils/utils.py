@@ -44,15 +44,15 @@ def save_predict(args, output, gt, img_name, save_path):
     image = os.path.join(args.img_path, 'rgb/{:s}.png'.format(img_name))
     raw_image = io.imread(image)[:, :, :3]
 
-    classes_ls = [0, 1, 1, 2, 4, 5, 3]  # put the most important classes in the end to highlight
+    classes_ls = [0, 1, 2, 4, 5, 3]  # put the most important classes in the end to highlight
 
     output_ = output.copy()
     for idx, class_id in enumerate(classes_ls):
-        output[output_ == class_id] = int((idx / len(classes_ls)) * 255)
+        output[output_ == class_id] = int(((idx + 1) / len(classes_ls)) * 255)
 
     gt_ = gt.copy()
     for idx, class_id in enumerate(classes_ls):
-        gt[gt_ == class_id] = int((idx / len(classes_ls)) * 255)
+        gt[gt_ == class_id] = int(((idx + 1) / len(classes_ls)) * 255)
 
     fig, axes = plt.subplots(1, 3)
     axes[0].axis('off')

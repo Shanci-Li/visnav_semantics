@@ -6,9 +6,9 @@ from torch.utils import data
 from argparse import ArgumentParser
 from prettytable import PrettyTable
 from builders.model_builder import build_model
-from baseline.utils.losses.loss import CrossEntropyLoss2d
 from model_data_loader import SenmanticData
 from builders.validation_builder import predict_multiscale_sliding
+from baseline.utils.losses.loss import CrossEntropyLoss2d, FocalLoss2d, DiceLoss
 
 
 def main(args):
@@ -22,9 +22,8 @@ def main(args):
         t.add_row([k, vars(args)[k]])
     print(t.get_string(title="Predict Arguments"))
 
-    class_name = ['No data', 'Unclassified and temporary objects', 'Ground', 'Vegetation', 'Buildings', 'Water',
-                  'Bridges']
-    label_index = [0, 1, 2, 3, 4, 5, 6]
+    class_name = ['Sky', 'Ground', 'Vegetation', 'Buildings', 'Water', 'Bridges']
+    label_index = [0, 1, 2, 3, 4, 5]
     class_dict_df = pd.DataFrame([class_name, label_index], index=['class_name', 'label_index']).T
     class_dict_df = class_dict_df.set_index('label_index')
 
@@ -32,8 +31,9 @@ def main(args):
     model = build_model(args.model, args.classes, args.backbone, args.pretrained, args.out_stride, args.mult_grid)
 
     # load the test set
-
-    test_set = SenmanticData('./datasets/EPFL/test_real')
+    test_path = './datasets/EPFL/test_drone_real'
+    args.img_path = test_path
+    test_set = SenmanticData(test_path)
 
     DataLoader = data.DataLoader(test_set, batch_size=args.batch_size,
                 shuffle=False, num_workers=args.batch_size, pin_memory=True, drop_last=False)
@@ -65,7 +65,15 @@ def main(args):
             print("no checkpoint found at '{}'".format(args.checkpoint))
             raise FileNotFoundError("no checkpoint found at '{}'".format(args.checkpoint))
 
-    # define loss function
+    # define loss function, respectively
+    # Default uses cross quotient loss function
+    if args.loss == 'CrossEntropyLoss2d':
+        criterion = CrossEntropyLoss2d()
+    elif args.loss == 'DiceLoss':
+        criterion = DiceLoss()
+    elif args.loss == 'FocalLoss2d':
+        criterion = FocalLoss2d()
+
     criterion = CrossEntropyLoss2d()
     print(">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\n"
           ">>>>>>>>>>>  beginning testing   >>>>>>>>>>>>\n"
@@ -97,23 +105,25 @@ if __name__ == '__main__':
                         help=" the tile_size is when evaluating or testing")
     parser.add_argument('--input_size', type=str, default=(480, 720),
                         help=" the input_size is for build ProbOhemCrossEntropy2d loss")
-    parser.add_argument('--checkpoint', type=str, default='/media/shanci/Samsung_T5/checkpoint/Deeplabv3plus_res50/CrossEntropyLoss2d/best_model.pth',
+    parser.add_argument('--checkpoint', type=str,
+                        default='/media/shanci/Samsung_T5/checkpoint/EPFL/Deeplabv3plus_res50'
+                                '/CrossEntropyLoss2d/normalized/best_model.pth',
                         help="use the file to load the checkpoint for evaluating or testing ")
-    parser.add_argument('--img_path', type=str, default='./datasets/EPFL/test_real',
+    parser.add_argument('--img_path', type=str, default=None,
                         help="Directory where the raw images are in")
     parser.add_argument('--save_seg_dir', type=str, default="./outputs/",
                         help="saving path of prediction result")
     parser.add_argument('--loss', type=str, default="CrossEntropyLoss2d",
-                        choices=['CrossEntropyLoss2d', 'ProbOhemCrossEntropy2d', 'CrossEntropyLoss2dLabelSmooth',
-                                 'LovaszSoftmax', 'FocalLoss2d'], help="choice loss for train or val in list")
+                        choices=['CrossEntropyLoss2d', 'DiceLoss', 'FocalLoss2d'],
+                        help="choice loss for train or val in list")
     parser.add_argument('--cuda', default=True, help="run on CPU or GPU")
     parser.add_argument("--gpus", default="0", type=str, help="gpu ids (default: 0)")
     parser.add_argument('--local_rank', type=int, default=0)
-    parser.add_argument('--classes', default=7, help="number of classes")
+    parser.add_argument('--classes', default=6, help="number of classes")
     args = parser.parse_args()
 
     save_dirname = args.checkpoint.split('/')[-2] + '_' + args.checkpoint.split('/')[-1].split('.')[0]
 
-    args.save_seg_dir = os.path.join(args.save_seg_dir, save_dirname)
+    args.save_seg_dir = os.path.join(args.save_seg_dir, args.checkpoint.split('/')[-3], save_dirname)
 
     main(args)
