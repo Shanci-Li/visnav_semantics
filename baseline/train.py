@@ -8,6 +8,7 @@ import pandas as pd
 import torch.nn.functional as F
 from tqdm import tqdm
 from torch.utils import data
+from torch.utils.data import ConcatDataset
 from argparse import ArgumentParser
 from builders.model_builder import build_model
 from builders.validation_builder import predict_multiscale_sliding
@@ -94,9 +95,17 @@ def main(args):
         criterion = FocalLoss2d()
 
     # load train set
-    train_set = SenmanticData('./datasets/' + args.dataset + '/train_sim', normalization=args.normalization)
-    val_set = SenmanticData('./datasets/' + args.dataset + '/val_sim', normalization=args.normalization)
-    test_set = SenmanticData('./datasets/' + args.dataset + '/train_drone_real', normalization=args.normalization)
+    if args.train_real:
+        sim_set = SenmanticData('./datasets/' + args.dataset + '/train_sim', augmentation=args.augmentation)
+        real_set = SenmanticData('./datasets/' + args.dataset + '/train_drone_real', augmentation=args.augmentation)
+        train_set = ConcatDataset([sim_set, real_set])
+
+        val_set = SenmanticData('./datasets/' + args.dataset + '/val_drone_real', augmentation=args.augmentation)
+        args.img_path = './datasets/' + args.dataset + '/val_drone_real'
+    else:
+        train_set = SenmanticData('./datasets/' + args.dataset + '/train_sim', augmentation=args.augmentation)
+        val_set = SenmanticData('./datasets/' + args.dataset + '/val_sim', augmentation=args.augmentation)
+        args.img_path = './datasets/' + args.dataset + '/val_sim'
 
     # move model and criterion on cuda
     if args.cuda:
@@ -105,8 +114,6 @@ def main(args):
         trainLoader = data.DataLoader(train_set, batch_size=args.batch_size,
                                      shuffle=True, num_workers=args.batch_size, pin_memory=True, drop_last=False)
         valLoader = data.DataLoader(val_set, batch_size=args.batch_size,
-                                     shuffle=True, num_workers=args.batch_size, pin_memory=True, drop_last=False)
-        testLoader = data.DataLoader(test_set, batch_size=args.batch_size,
                                      shuffle=True, num_workers=args.batch_size, pin_memory=True, drop_last=False)
 
         if not torch.cuda.is_available():
@@ -121,15 +128,19 @@ def main(args):
     elif args.optim == 'adamw':
         optimizer = torch.optim.AdamW(parameters, lr=args.lr, weight_decay=5e-4)
 
-    scheduler = MultiStepLR(optimizer, milestones=[10, 20, 25, 30, 40], gamma=0.5)
+    scheduler = MultiStepLR(optimizer, milestones=[20, 30, 40], gamma=0.5)
 
     # initial log file val output save
-    if args.normalization:
-        dir_normal = 'normalized'
+    if args.augmentation:
+        dir_aug = 'augmentation'
     else:
-        dir_normal = 'not_normalized'
+        dir_aug = 'no_augmentation'
 
-    args.savedir = os.path.join(args.savedir, args.dataset, args.model, args.loss, dir_normal)
+    if args.train_real:
+        dir_train_real = 'with_real_data'
+    else:
+        dir_train_real = 'sim_data'
+    args.savedir = os.path.join(args.savedir, args.dataset, args.model, args.loss, dir_aug, dir_train_real)
     if not os.path.exists(args.savedir) and args.local_rank == 0:
         os.makedirs(args.savedir)
 
@@ -204,14 +215,14 @@ def main(args):
         if args.local_rank == 0:
             lossTr_list.append(lossTr)
 
-        # save the checkpoints
-        model_file_name = args.savedir + '/checkpoint_epoch_{}.pth'.format(epoch)
-        state = {
-            "epoch": epoch,
-            "model": model.state_dict(),
-            'optimizer': optimizer.state_dict()
-        }
-        torch.save(state, model_file_name)
+        # # save the checkpoints
+        # model_file_name = args.savedir + '/checkpoint_epoch_{}.pth'.format(epoch)
+        # state = {
+        #     "epoch": epoch,
+        #     "model": model.state_dict(),
+        #     'optimizer': optimizer.state_dict()
+        # }
+        # torch.save(state, model_file_name)
 
         train_end = time.time()
         train_per_epoch_seconds = train_end - train_start
@@ -279,7 +290,7 @@ def main(args):
 
                     loss, FWIoU, Miou, Miou_Noback, PerCiou_set, Pa, PerCpa_set, Mpa, MF, F_set, F1_Noback = \
                         predict_multiscale_sliding(args=args, model=model,
-                                                   testLoader=testLoader,
+                                                   testLoader=valLoader,
                                                    scales=[1.0],
                                                    overlap=0.3,
                                                    criterion=criterion,
@@ -304,9 +315,11 @@ def parse_args():
                         help="dataset to train: EPFL or comballaz")
     parser.add_argument('--pretrained', type=bool, default=True,
                         help="whether choice backbone pretrained on imagenet")
-    parser.add_argument('--normalization', type=bool, default=False,
-                        help="whether normalize the input image")
-    parser.add_argument('--img_path', type=str, default='./datasets/EPFL/val_sim',
+    parser.add_argument('--augmentation', type=bool, default=True,
+                        help="whether augment the input image")
+    parser.add_argument('--train_real', type=bool, default=True,
+                        help="whether use real data in training")
+    parser.add_argument('--img_path', type=str, default=None,
                         help="Directory where the raw images are in")
     parser.add_argument('--out_stride', type=int, default=16, help="output stride of backbone")
     parser.add_argument('--mult_grid', action='store_true',
@@ -318,7 +331,7 @@ def parse_args():
     parser.add_argument('--max_epochs', type=int, default=50, help="the number of epochs: 300 for train")
     parser.add_argument('--batch_size', type=int, default=4, help="the batch size is set to 16 GPU")
     parser.add_argument('--val_epochs', type=int, default=5, help="the number of epochs: 100 for val set")
-    parser.add_argument('--lr', type=float, default=1e-3, help="initial learning rate")
+    parser.add_argument('--lr', type=float, default=2e-4, help="initial learning rate")
     parser.add_argument('--optim', type=str.lower, default='adam', choices=['sgd', 'adam', 'adamw'],
                         help="select optimizer")
     parser.add_argument('--predict_type', default="validation", choices=["validation", "predict"],

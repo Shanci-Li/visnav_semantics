@@ -1,6 +1,8 @@
 import os
+import cv2
 import torch
 import numpy as np
+import albumentations as A
 import torch.utils.model_zoo as model_zoo
 
 from PIL import Image
@@ -28,14 +30,14 @@ model_urls = {
 
 
 class SenmanticData(Dataset):
-    def __init__(self, dir_path, normalization=False):
+    def __init__(self, dir_path, augmentation=False):
         """
         Args:
             data_path (string): path to file
             transform: pytorch transforms for transforms and tensor conversion
         """
         # Transforms
-        self.normal = normalization
+        self.augmentation = augmentation
         self.to_tensor = T.ToTensor()
         # Read the file
         self.img_path = dir_path + '/rgb'
@@ -44,13 +46,24 @@ class SenmanticData(Dataset):
         self.file_ls = [file.split('.')[0] for file in self.file_ls]
         # Calculate len
         self.data_len = len(self.file_ls)
-        if self.normal:
-            # normalize
-            normalize = T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            self.transforms = T.Compose([
-                # T.RandomResizedCrop(224),
-                # T.RandomHorizontalFlip(),
-                normalize
+        if self.augmentation:
+            # image augmentation
+            self.transform = A.Compose([
+                A.OneOf([
+                    A.RandomGamma(gamma_limit=(60, 120), p=0.5),
+                    A.ColorJitter (brightness=0.2, contrast=0.2, saturation=0.2, hue=0.2, always_apply=False, p=0.5),
+                    A.GaussNoise (var_limit=(10.0, 50.0), mean=0, per_channel=True, always_apply=False, p=0.5)
+                ]),
+                A.CLAHE(clip_limit=4.0, tile_grid_size=(4, 4), p=0.9),
+                A.HorizontalFlip(p=0.5),
+                A.ShiftScaleRotate(shift_limit=0.2, scale_limit=0.2, rotate_limit=20,
+                                   interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, p=1),
+                A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0)
+            ])
+        else:
+            self.transform = A.Compose([
+                A.CLAHE(clip_limit=4.0, tile_grid_size=(4, 4), p=1.0),
+                A.Normalize(mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225), max_pixel_value=255.0, p=1.0)
             ])
 
 
@@ -70,15 +83,20 @@ class SenmanticData(Dataset):
         label_path = self.label_path + '/' + self.file_ls[index] + '.npy'
         # Open image
         img_npy = np.array(Image.open(image_path))[:, :, :3]
-        # Transform image to tensor
-        img_tensor = self.to_tensor(img_npy)
-        if self.normal:   
-            img_tensor = self.transforms(img_tensor)
+
         # read semantic label
-        label = self.convert_label(np.load(label_path))
+        label = np.load(label_path)
+
+        transformed = self.transform(image=img_npy, mask=label)
+        img = transformed['image']
+        mask = transformed['mask']
+
+        # Transform image to tensor
+        img_tensor = self.to_tensor(img)
+        mask = self.convert_label(mask)
         name = self.file_ls[index]
 
-        return img_tensor, label, name
+        return img_tensor, mask, name
 
     def __len__(self):
         return self.data_len

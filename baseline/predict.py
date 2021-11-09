@@ -33,7 +33,7 @@ def main(args):
     # load the test set
     test_path = './datasets/EPFL/test_drone_real'
     args.img_path = test_path
-    test_set = SenmanticData(test_path)
+    test_set = SenmanticData(test_path, augmentation=False)
 
     DataLoader = data.DataLoader(test_set, batch_size=args.batch_size,
                 shuffle=False, num_workers=args.batch_size, pin_memory=True, drop_last=False)
@@ -89,6 +89,8 @@ if __name__ == '__main__':
     parser.add_argument('--backbone', type=str, default="resnet50", help="backbone name")
     parser.add_argument('--pretrained', action='store_true',
                         help="whether choice backbone pretrained on imagenet")
+    parser.add_argument('--augmentation', type=bool, default=False,
+                        help="whether augment the input image")
     parser.add_argument('--out_stride', type=int, default=16, help="output stride of backbone")
     parser.add_argument('--mult_grid', action='store_true',
                         help="whether choice mult_grid in backbone last layer")
@@ -107,11 +109,11 @@ if __name__ == '__main__':
                         help=" the input_size is for build ProbOhemCrossEntropy2d loss")
     parser.add_argument('--checkpoint', type=str,
                         default='/media/shanci/Samsung_T5/checkpoint/EPFL/Deeplabv3plus_res50'
-                                '/CrossEntropyLoss2d/normalized/best_model.pth',
+                                '/CrossEntropyLoss2d/augmentation/with_real_data/best_model.pth',
                         help="use the file to load the checkpoint for evaluating or testing ")
     parser.add_argument('--img_path', type=str, default=None,
                         help="Directory where the raw images are in")
-    parser.add_argument('--save_seg_dir', type=str, default="./outputs/",
+    parser.add_argument('--save_seg_dir', type=str, default=None,
                         help="saving path of prediction result")
     parser.add_argument('--loss', type=str, default="CrossEntropyLoss2d",
                         choices=['CrossEntropyLoss2d', 'DiceLoss', 'FocalLoss2d'],
@@ -122,8 +124,8 @@ if __name__ == '__main__':
     parser.add_argument('--classes', default=6, help="number of classes")
     args = parser.parse_args()
 
-    save_dirname = args.checkpoint.split('/')[-2] + '_' + args.checkpoint.split('/')[-1].split('.')[0]
+    save_dirname = 'predict_results'
 
-    args.save_seg_dir = os.path.join(args.save_seg_dir, args.checkpoint.split('/')[-3], save_dirname)
+    args.save_seg_dir = os.path.join('/'.join(args.checkpoint.split('/')[:-1]), save_dirname)
 
     main(args)

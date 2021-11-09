@@ -7,7 +7,7 @@ np.seterr(divide='ignore', invalid='ignore')
 __all__ = ['SegmentationMetric']
 
 """
-confusionMetric  # 注意：此处横着代表预测值，竖着代表真实值，与之前介绍的相反
+confusionMetric  
 P\L     P    N
 P      TP    FP
 N      FN    TN
@@ -80,9 +80,9 @@ class SegmentationMetric(object):
         self.confusionMatrix = np.zeros((self.numClass, self.numClass))
 
 if __name__ == '__main__':
-    imgPredict = np.array([0, 0, 1, 1, 2, 2]) # 可直接换成预测图片
-    imgLabel = np.array([0, 0, 1, 1, 1, 2]) # 可直接换成标注图片
-    metric = SegmentationMetric(3) # 3表示有3个分类，有几个分类就填几
+    imgPredict = np.array([0, 0, 1, 1, 2, 2])
+    imgLabel = np.array([0, 0, 1, 1, 1, 2])
+    metric = SegmentationMetric(3)
     metric.addBatch(imgPredict, imgLabel)
     pa = metric.pixelAccuracy()
     cpa = metric.classPixelAccuracy()
