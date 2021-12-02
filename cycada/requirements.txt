@@ -1,0 +1,16 @@
+scipy~=1.7.2
+torchvision~=0.11.1
+tensorboardX~=2.4
+tensorflow
+click~=8.0.3
+tqdm~=4.62.3
+requests~=2.26.0
+colorlog
+pyyaml~=6.0
+
+numpy~=1.21.4
+torch~=1.10.0
+pillow~=8.4.0
+opencv-python~=4.5.4.60
+albumentations~=1.1.0
+scikit-learn~=1.0.1
