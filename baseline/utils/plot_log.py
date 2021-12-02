@@ -1,11 +1,11 @@
-import matplotlib
+import os.path
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib import pyplot as plt
 
 
-def draw_log(args, epoch, epoch_list, lossTr_list, mIOU_val_list, lossVal_list):
-    f = open(args.savedir + 'log.txt', 'r')
+def draw_log(args, epoch, epoch_list, lossTr_list, mIOU_val_list, fwIoU_val_list, lossVal_list):
+    f = open(os.path.join(args.savedir, 'log.txt'), 'r')
     next(f)
     if args.val_epochs == 1:
         try:
@@ -22,7 +22,7 @@ def draw_log(args, epoch, epoch_list, lossTr_list, mIOU_val_list, lossVal_list):
             ax1.set_xlabel("Epochs")
             ax1.set_ylabel("Current loss")
             ax1.legend()
-            plt.savefig(args.savedir + "loss.png")
+            plt.savefig(os.path.join(args.savedir, "loss.png"))
             plt.close('all')
             plt.clf()
             # plt Miou
@@ -32,7 +32,16 @@ def draw_log(args, epoch, epoch_list, lossTr_list, mIOU_val_list, lossVal_list):
             ax2.set_xlabel("Epochs")
             ax2.set_ylabel("Current IoU")
             ax2.legend()
-            plt.savefig(args.savedir + "mIou.png")
+            plt.savefig(os.path.join(args.savedir, "mIou.png"))
+            plt.close('all')
+            # plt fwIoU
+            fig3, ax3 = plt.subplots(figsize=(11, 8))
+            ax3.plot(range(1, epoch + 1), fwIoU_val_list, label="Val fwIoU")
+            ax3.set_title("Average fwIoU vs epochs")
+            ax3.set_xlabel("Epochs")
+            ax3.set_ylabel("Current fwIoU")
+            ax3.legend()
+            plt.savefig(os.path.join(args.savedir, "fwIou.png"))
             plt.close('all')
     else:
         # plt loss
@@ -49,7 +58,7 @@ def draw_log(args, epoch, epoch_list, lossTr_list, mIOU_val_list, lossVal_list):
             ax1.set_xlabel("Epochs")
             ax1.set_ylabel("Current loss")
             ax1.legend()
-            plt.savefig(args.savedir + "loss.png")
+            plt.savefig(os.path.join(args.savedir, "loss.png"))
             plt.clf()
             # plt Miou
             fig2, ax2 = plt.subplots(figsize=(11, 8))
@@ -58,5 +67,14 @@ def draw_log(args, epoch, epoch_list, lossTr_list, mIOU_val_list, lossVal_list):
             ax2.set_xlabel("Epochs")
             ax2.set_ylabel("Current IoU")
             ax2.legend()
-            plt.savefig(args.savedir + "mIou.png")
+            plt.savefig(os.path.join(args.savedir, "mIou.png"))
+            plt.close('all')
+            # plt fwIoU
+            fig3, ax3 = plt.subplots(figsize=(11, 8))
+            ax3.plot(epoch_list, fwIoU_val_list, label="Val fwIoU")
+            ax3.set_title("Average fwIoU vs epochs")
+            ax3.set_xlabel("Epochs")
+            ax3.set_ylabel("Current fwIoU")
+            ax3.legend()
+            plt.savefig(os.path.join(args.savedir, "fwIou.png"))
             plt.close('all')

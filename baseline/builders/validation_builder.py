@@ -23,6 +23,7 @@ def eval_metric(args, class_dict_df, metric, count_loss, loss):
 
     Pa = np.around(Pa, decimals=4)
     Miou = np.around(Miou, decimals=4)
+    fwIoU = np.around(FWIoU, decimals=4)
     Precision = np.around(Precision, decimals=4)
     Recall = np.around(Recall, decimals=4)
     P = np.sum(Precision[:]) / len(Precision[:])
@@ -54,21 +55,21 @@ def eval_metric(args, class_dict_df, metric, count_loss, loss):
         t.add_row([key, class_dict_df['class_name'][key], PerCiou_set[key], Precision[key], Recall[key], F1[key]])
     print(t.get_string(title="Validation results"))
     print('OA:{:.4f}'
-          '\nMIoU:{:.4f}       MIoU_Noback:{:.4f}'
+          '\nMIoU:{:.4f}       fwIoU:{:.4f}'
           '\nPrecision:{:.4f}  Precision_Noback:{:.4f}'
           '\nRecall:{:.4f}     Recall_Noback:{:.4f}'
           '\nF1:{:.4f}         F1_Noback:{:.4f}'
-          .format(Pa, Miou, Miou_Noback, P, P_Noback, R, R_Noback, F, F1_Noback))
+          .format(Pa, Miou, fwIoU, P, P_Noback, R, R_Noback, F, F1_Noback))
 
-    result = args.save_seg_dir + '/results.txt'
+    result = os.path.join(args.save_seg_dir, 'results.txt')
     with open(result, 'w') as f:
         f.write(str(t.get_string(title="Validation results")))
         f.write('\nOA:{:.4f}'
-                '\nMIoU:{:.4f}       MIoU_Noback:{:.4f}'
+                '\nMIoU:{:.4f}       fwIoU:{:.4f}'
                 '\nPrecision:{:.4f}  Precision_Noback:{:.4f}'
                 '\nRecall:{:.4f}     Recall_Noback:{:.4f}'
                 '\nF1:{:.4f}         F1_Noback:{:.4f}\n'
-                .format(Pa, Miou, Miou_Noback, P, P_Noback, R, R_Noback, F, F1_Noback))
+                .format(Pa, Miou, fwIoU, P, P_Noback, R, R_Noback, F, F1_Noback))
 
     return loss, FWIoU, Miou, Miou_Noback, PerCiou_set, Pa, PerCpa_set, Mpa, MF, F_set, F1_Noback
 

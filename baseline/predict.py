@@ -31,7 +31,8 @@ def main(args):
     model = build_model(args.model, args.classes, args.backbone, args.pretrained, args.out_stride, args.mult_grid)
 
     # load the test set
-    test_path = './datasets/EPFL/test_drone_real'
+    # test_path = './datasets/EPFL/test_oop_drone_real'
+    test_path = args.test_dir
     args.img_path = test_path
     test_set = SenmanticData(test_path, augmentation=False)
 
@@ -44,6 +45,8 @@ def main(args):
         cudnn.benchmark = True
         if not torch.cuda.is_available():
             raise Exception("no GPU found or wrong gpu id, please run without --cuda")
+
+    args.save_seg_dir = os.path.join(args.save_seg_dir, test_path.split('/')[-1])
 
     if not os.path.exists(args.save_seg_dir):
         os.makedirs(args.save_seg_dir)
@@ -89,6 +92,8 @@ if __name__ == '__main__':
     parser.add_argument('--backbone', type=str, default="resnet50", help="backbone name")
     parser.add_argument('--pretrained', action='store_true',
                         help="whether choice backbone pretrained on imagenet")
+    parser.add_argument('--test_dir', type=str, default='./datasets/EPFL/test_oop_drone_real',
+                        help="Directory where the test data is")
     parser.add_argument('--augmentation', type=bool, default=False,
                         help="whether augment the input image")
     parser.add_argument('--out_stride', type=int, default=16, help="output stride of backbone")
@@ -109,7 +114,7 @@ if __name__ == '__main__':
                         help=" the input_size is for build ProbOhemCrossEntropy2d loss")
     parser.add_argument('--checkpoint', type=str,
                         default='/media/shanci/Samsung_T5/checkpoint/EPFL/Deeplabv3plus_res50'
-                                '/CrossEntropyLoss2d/augmentation/with_real_data/best_model.pth',
+                                '/CrossEntropyLoss2d/augmentation/with_real_data_inplace/best_model.pth',
                         help="use the file to load the checkpoint for evaluating or testing ")
     parser.add_argument('--img_path', type=str, default=None,
                         help="Directory where the raw images are in")
@@ -124,7 +129,7 @@ if __name__ == '__main__':
     parser.add_argument('--classes', default=6, help="number of classes")
     args = parser.parse_args()
 
-    save_dirname = 'predict_results'
+    save_dirname = 'predict_results_oop_mIoU'
 
     args.save_seg_dir = os.path.join('/'.join(args.checkpoint.split('/')[:-1]), save_dirname)
 

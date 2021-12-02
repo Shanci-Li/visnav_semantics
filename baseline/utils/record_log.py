@@ -1,3 +1,4 @@
+import os
 from prettytable import PrettyTable
 
 
@@ -6,7 +7,7 @@ class record_log():
         self.args = args
 
     def record_args(self, datas, total_paramters, GLOBAL_SEED):
-        with open(self.args.savedir + 'args.txt', 'w') as f:
+        with open(os.path.join(self.args.savedir, 'args.txt'), 'w') as f:
             t = PrettyTable(['args_name', 'args_value'])
             for k in list(vars(self.args).keys()):
                 t.add_row([k, vars(self.args)[k]])
@@ -18,12 +19,13 @@ class record_log():
             print(t.get_string(title="Train Arguments"))
             f.write(str(t))
 
-    def record_best_epoch(self, epoch, Best_Miou, Pa):
-        with open(self.args.savedir + 'args.txt', 'a+') as f:
-            f.write('\nBest Validation Epoch {} Best_Miou is {} OA is {}'.format(epoch, Best_Miou, Pa))
+    def record_best_epoch(self, epoch, Best_Miou, Best_fwIoU, Pa):
+        with open(os.path.join(self.args.savedir, 'args.txt'), 'a+') as f:
+            f.write('\nBest Validation Epoch {} Best_Miou is {} Best fwIoU is {} OA is {}'.format(
+                epoch, Best_Miou, Best_fwIoU, Pa))
 
     def initial_logfile(self):
-        logFileLoc = self.args.savedir + self.args.logFile
+        logFileLoc = os.path.join(self.args.savedir, self.args.logFile)
         logger = open(logFileLoc, 'w')
         logger.write(("{}\t{}\t\t{}\t{}\t{}\t{}\t{}\t{}\t\t{}\t\t{}\n".format(
             'Epoch', '   lr', 'Loss(Tr)', 'Loss(Val)', 'FWIOU(Val)', 'mIOU(Val)',  'Pa(Val)', '    Mpa(Val)',
@@ -31,7 +33,7 @@ class record_log():
         return logger
 
     def resume_logfile(self):
-        logFileLoc = self.args.savedir + self.args.logFile
+        logFileLoc = os.path.join(self.args.savedir, self.args.logFile)
         logger_recored = open(logFileLoc, 'r')
         next(logger_recored)
         lines = logger_recored.readlines()

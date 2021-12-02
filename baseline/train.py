@@ -96,9 +96,10 @@ def main(args):
 
     # load train set
     if args.train_real:
-        sim_set = SenmanticData('./datasets/' + args.dataset + '/train_sim', augmentation=args.augmentation)
+        LHS_set = SenmanticData('./datasets/' + args.dataset + '/train_sim', augmentation=args.augmentation)
         real_set = SenmanticData('./datasets/' + args.dataset + '/train_drone_real', augmentation=args.augmentation)
-        train_set = ConcatDataset([sim_set, real_set])
+        sim_set = SenmanticData('./datasets/' + args.dataset + '/train_drone_sim', augmentation=args.augmentation)
+        train_set = ConcatDataset([LHS_set, sim_set, real_set])
 
         val_set = SenmanticData('./datasets/' + args.dataset + '/val_drone_real', augmentation=args.augmentation)
         args.img_path = './datasets/' + args.dataset + '/val_drone_real'
@@ -167,9 +168,12 @@ def main(args):
     epoch_list = []
     lossTr_list = []
     Miou_list = []
+    fwIoU_list = []
     lossVal_list = []
     Miou = 0
+    FWIoU = 0
     Best_Miou = 0
+    Best_fwIoU = 0
     # continue training
     if args.resume:
         logger, lines = recorder.resume_logfile()
@@ -178,6 +182,7 @@ def main(args):
             if len(line.strip().split()) != 3:
                 epoch_list.append(int(line.strip().split()[0]))
                 lossVal_list.append(float(line.strip().split()[3]))
+                fwIoU_list.append(float(line.strip().split()[4]))
                 Miou_list.append(float(line.strip().split()[5]))
 
         if os.path.isfile(args.resume):
@@ -248,6 +253,7 @@ def main(args):
             if args.local_rank == 0:
                 epoch_list.append(epoch)
                 Miou_list.append(Miou)
+                fwIoU_list.append(FWIoU)
                 lossVal_list.append(loss.item())
                 # record trainVal information
                 recorder.record_trainVal_log(logger, epoch, lr, lossTr, loss,
@@ -265,11 +271,9 @@ def main(args):
 
         if args.local_rank == 0:
             # draw log fig
-            draw_log(args, epoch, epoch_list, lossTr_list, Miou_list, lossVal_list)
+            draw_log(args, epoch, epoch_list, lossTr_list, Miou_list, fwIoU_list, lossVal_list)
 
             # save the model
-            model_file_name = args.savedir + '/best_model.pth'
-            last_model_file_name = args.savedir + '/last_model.pth'
             state = {
                 "epoch": epoch,
                 "model": model.state_dict(),
@@ -277,13 +281,21 @@ def main(args):
             }
             if Miou > Best_Miou:
                 Best_Miou = Miou
+                model_file_name = os.path.join(args.savedir, 'best_Miou_model.pth')
                 torch.save(state, model_file_name)
-                recorder.record_best_epoch(epoch, Best_Miou, Pa)
+                recorder.record_best_epoch(epoch, Best_Miou, Best_fwIoU, Pa)
+
+            if FWIoU > Best_fwIoU:
+                Best_fwIoU = FWIoU
+                model_file_name = os.path.join(args.savedir, 'best_fwIoU_model.pth')
+                torch.save(state, model_file_name)
+                recorder.record_best_epoch(epoch, Best_Miou, Best_fwIoU, Pa)
 
             # early_stopping monitor
             early_stopping.monitor(monitor=Miou)
             if early_stopping.early_stop:
                 print("Early stopping and Save checkpoint")
+                last_model_file_name = os.path.join(args.savedir, 'last_model.pth')
                 if not os.path.exists(last_model_file_name):
                     torch.save(state, last_model_file_name)
                     torch.cuda.empty_cache()  # empty_cache
