@@ -206,10 +206,11 @@ class ASPP_module(nn.Module):
 
 
 class Deeplabv3plus(nn.Module):
-    def __init__(self, backbone, num_classes=3, os=16, freeze_bn=False):
+    def __init__(self, backbone, num_classes=3, os=16, freeze_bn=False, output_feature=False):
         super(Deeplabv3plus, self).__init__()
 
         self.resnet_features = backbone
+        self.output_feature = output_feature
 
         if os == 16:
             dilations = [1, 6, 12, 18]
@@ -253,6 +254,7 @@ class Deeplabv3plus(nn.Module):
         x4 = self.aspp4(x)
         x5 = self.global_avg_pool(x)
         x5 = F.interpolate(x5, size=x4.size()[2:], mode='bilinear', align_corners=True)
+        features = torch.concat([x, x1, x2, x3, x4, x5], dim=1)
         x = torch.cat((x1, x2, x3, x4, x5), dim=1)
         x = self.conv1(x)
         x = self.bn1(x)
@@ -267,7 +269,11 @@ class Deeplabv3plus(nn.Module):
         x = torch.cat((x, low_level_features), dim=1)
         x = self.last_conv(x)
         x = F.interpolate(x, size=input.size()[2:], mode='bilinear', align_corners=True)
-        return x
+
+        if self.output_feature:
+            return x, features
+        else:
+            return x
 
     def _freeze_bn(self):
         for m in self.modules():
@@ -299,7 +305,7 @@ class Deeplabv3plus(nn.Module):
 #     return model
 
 
-def Deeplabv3plus_res50(num_classes=3, os=16, pretrained=False):
+def Deeplabv3plus_res50(num_classes=3, os=16, pretrained=False, output_feature=False):
     resnet50 = ResNet(Bottleneck, [3, 4, 6, 3], os)
     if pretrained:
         pretrain_dict = model_zoo.load_url(model_urls['resnet50'])
@@ -310,7 +316,8 @@ def Deeplabv3plus_res50(num_classes=3, os=16, pretrained=False):
                 model_dict[k] = v
         state_dict.update(model_dict)
         resnet50.load_state_dict(state_dict)
-    model = Deeplabv3plus(backbone=resnet50, num_classes=num_classes, os=os, freeze_bn=False)
+    model = Deeplabv3plus(backbone=resnet50, num_classes=num_classes, os=os,
+                          freeze_bn=False, output_feature=output_feature)
     return model
 
 

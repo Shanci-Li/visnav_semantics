@@ -10,8 +10,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torchsummary import summary
-from model.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
-from model.base_model import build_backbone
+from baseline.model.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
+from baseline.model.base_model import build_backbone
 
 
 class FCN_ResNet(nn.Module):

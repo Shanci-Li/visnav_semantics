@@ -15,12 +15,13 @@ def main():
     image_path = args.image_path
     output_path = args.output_path
 
+    # if sample a single image
     if args.single:
         file_ls = ['_'.join(label_path.split('_')[:-1])]
         label_path = '/'.join(label_path.split('/')[:-1])
         distance_path = '/'.join(distance_path.split('/')[:-1])
         image_path = '/'.join(image_path.split('/')[:-1])
-
+    # sample given number of images
     else:
         file_ls, _ = all_path(label_path, filter_list=['.npy'])
         file_ls = np.unique(file_ls).tolist()

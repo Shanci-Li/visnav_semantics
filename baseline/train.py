@@ -108,6 +108,21 @@ def main(args):
         val_set = SenmanticData('./datasets/' + args.dataset + '/val_sim', augmentation=args.augmentation)
         args.img_path = './datasets/' + args.dataset + '/val_sim'
 
+    # # load train set
+    # if args.train_real:
+    #     LHS_set = SenmanticData('/work/topo/VNAV/remade-data-downsampled-8/' + args.dataset + '/train_sim', augmentation=args.augmentation)
+    #     real_set = SenmanticData('/work/topo/VNAV/remade-data-downsampled-8/' + args.dataset + '/train_drone_real', augmentation=args.augmentation)
+    #     sim_set = SenmanticData('/work/topo/VNAV/remade-data-downsampled-8/' + args.dataset + '/train_drone_sim', augmentation=args.augmentation)
+    #     train_set = ConcatDataset([LHS_set, sim_set, real_set])
+    #
+    #     val_set = SenmanticData('/work/topo/VNAV/remade-data-downsampled-8/' + args.dataset + '/val_drone_real', augmentation=args.augmentation)
+    #     args.img_path = '/work/topo/VNAV/remade-data-downsampled-8/' + args.dataset + '/val_drone_real'
+    # else:
+    #     train_set = SenmanticData('/work/topo/VNAV/remade-data-downsampled-8/' + args.dataset + '/train_sim', augmentation=args.augmentation)
+    #     val_set = SenmanticData('/work/topo/VNAV/remade-data-downsampled-8/' + args.dataset + '/val_sim', augmentation=args.augmentation)
+    #     args.img_path = '/work/topo/VNAV/remade-data-downsampled-8/' + args.dataset + '/val_sim'
+
+
     # move model and criterion on cuda
     if args.cuda:
         device = torch.device("cuda:0" if torch.cuda.is_available() else RuntimeError)
@@ -364,6 +379,8 @@ def parse_args():
                         help="use this file to load last checkpoint for continuing training")
     parser.add_argument('--savedir', default="/media/shanci/Samsung_T5/checkpoint/",
                         help="directory to save the model snapshot")
+    # parser.add_argument('--savedir', default="/home/shanli/baseline/checkpoint/",
+    #                     help="directory to save the model snapshot")
     parser.add_argument('--logFile', default="log.txt", help="storing the training and validation logs")
     parser.add_argument('--classes', default=6, help="number of classes")
     args = parser.parse_args()

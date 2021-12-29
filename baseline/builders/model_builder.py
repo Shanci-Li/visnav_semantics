@@ -21,7 +21,8 @@ model_urls = {
 }
 
 
-def build_model(model_name, num_classes, backbone='resnet50', pretrained=False, out_stride=32, mult_grid=False):
+def build_model(model_name, num_classes, backbone='resnet50', pretrained=False,
+                out_stride=16, mult_grid=False, output_feature=False):
     if model_name == 'FCN':
         model = FCN(num_classes=num_classes)
     elif model_name == 'FCN_ResNet':
@@ -37,7 +38,8 @@ def build_model(model_name, num_classes, backbone='resnet50', pretrained=False, 
     elif model_name == 'HRNet':
         model = HighResolutionNet(num_classes=num_classes)
     elif model_name == 'Deeplabv3plus_res50':
-        model = Deeplabv3plus_res50(num_classes=num_classes, os=out_stride, pretrained=True)
+        model = Deeplabv3plus_res50(num_classes=num_classes, os=out_stride,
+                                    pretrained=True, output_feature=output_feature)
     elif model_name == "DDRNet":
         model = DDRNet(pretrained=True, num_classes=num_classes)
     elif model_name == 'PSPNet_res50':

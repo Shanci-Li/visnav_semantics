@@ -4,8 +4,8 @@ Reference from source code by author: https://github.com/hszhao/semseg
 import torch
 from torch import nn
 import torch.nn.functional as F
-from model.PSPNet import resnet as models
-from model.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
+from baseline.model.PSPNet import resnet as models
+from baseline.model.sync_batchnorm.batchnorm import SynchronizedBatchNorm2d
 
 
 class PPM(nn.Module):

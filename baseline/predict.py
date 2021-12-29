@@ -92,8 +92,10 @@ if __name__ == '__main__':
     parser.add_argument('--backbone', type=str, default="resnet50", help="backbone name")
     parser.add_argument('--pretrained', action='store_true',
                         help="whether choice backbone pretrained on imagenet")
-    parser.add_argument('--test_dir', type=str, default='./datasets/EPFL/test_oop_drone_real',
+    parser.add_argument('--test_dir', type=str, default='./datasets/comballaz/test_drone_real',
                         help="Directory where the test data is")
+    # parser.add_argument('--test_dir', type=str, default='/work/topo/VNAV/remade-data-downsampled-8/EPFL/train_drone_real',
+    #                     help="Directory where the test data is")
     parser.add_argument('--augmentation', type=bool, default=False,
                         help="whether augment the input image")
     parser.add_argument('--out_stride', type=int, default=16, help="output stride of backbone")
@@ -113,8 +115,7 @@ if __name__ == '__main__':
     parser.add_argument('--input_size', type=str, default=(480, 720),
                         help=" the input_size is for build ProbOhemCrossEntropy2d loss")
     parser.add_argument('--checkpoint', type=str,
-                        default='/media/shanci/Samsung_T5/checkpoint/EPFL/Deeplabv3plus_res50'
-                                '/CrossEntropyLoss2d/augmentation/with_real_data_inplace/best_model.pth',
+                        default='/media/shanci/Samsung_T5/checkpoint/comballaz/sim_data_styled/best_fwIoU_model.pth',
                         help="use the file to load the checkpoint for evaluating or testing ")
     parser.add_argument('--img_path', type=str, default=None,
                         help="Directory where the raw images are in")
@@ -129,7 +130,8 @@ if __name__ == '__main__':
     parser.add_argument('--classes', default=6, help="number of classes")
     args = parser.parse_args()
 
-    save_dirname = 'predict_results_oop_mIoU'
+    # save_dirname = 'predict_results_oop_fwIoU'
+    save_dirname = 'predict_results_inplace_fwIoU'
 
     args.save_seg_dir = os.path.join('/'.join(args.checkpoint.split('/')[:-1]), save_dirname)
 

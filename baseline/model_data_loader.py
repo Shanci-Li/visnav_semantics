@@ -8,16 +8,16 @@ import torch.utils.model_zoo as model_zoo
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms as T
-from model.SegNet import SegNet
-from model.FCN8s import FCN
-from model.BiSeNet import BiSeNet
-from model.BiSeNetV2 import BiSeNetV2
-from model.PSPNet.pspnet import PSPNet
-from model.DeeplabV3Plus import Deeplabv3plus_res50
-from model.FCN_ResNet import FCN_ResNet
-from model.DDRNet import DDRNet
-from model.HRNet import HighResolutionNet
-from model.UNet import UNet
+from baseline.model.SegNet import SegNet
+from baseline.model.FCN8s import FCN
+from baseline.model.BiSeNet import BiSeNet
+from baseline.model.BiSeNetV2 import BiSeNetV2
+from baseline.model.PSPNet.pspnet import PSPNet
+from baseline.model.DeeplabV3Plus import Deeplabv3plus_res50
+from baseline.model.FCN_ResNet import FCN_ResNet
+from baseline.model.DDRNet import DDRNet
+from baseline.model.HRNet import HighResolutionNet
+from baseline.model.UNet import UNet
 
 
 model_urls = {
