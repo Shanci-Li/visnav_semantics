@@ -5,17 +5,17 @@
   Due to vulnerabilities in GNSS/GPS Systems, on which autonomous systems rely for navigation and control, alternative methods are in demand for absolute large-scale navigation. The low cost, availability of cameras have made them a popular sensor for drones as a way to capture information on the surrounding landscape [1] (depth, semantics, feature and flow tracking). 
   State-of-the-art (ML) visual re-localisation based methods [2]–[4] show promising performance but typically focus on single-domain training. This poses a serious barrier for the adaptation in real-world scenarios as they require large datasets of high-quality real images within the desired area. Another lacking aspect is the lack of meaningful confidence bounds in the absolute pose estimation. A critical requirement for any downstream navigation filter/scheme.
   Previous projects at the TOPO lab [5]–[7] aimed at using synthetic data generated with the use of geospatial framework database Cesium [8]. The approach utilized at TOPO can best be summarized in two steps, the first being a coordinate regression by means of a deep neural network followed by the extraction of the pose by a PnP solver (Figure 1). 
-  
-![Image text](https://gitlab.epfl.ch/TOPO_MachineLearning/visnav_topo/visnav_semantics/-/blob/main/img/figure1.png)
+
+<p align="center"><img src="imgs/figure1.png"/></p>
   
 The current architecture has shown the median performance of close to 6 m (absolute WSG84 position) and 2.5 deg (orientation) in synthetic validation datasets. This performance is significantly degraded when out of domain data is being used.
 
-![Image text](https://gitlab.epfl.ch/TOPO_MachineLearning/visnav_topo/visnav_semantics/-/blob/main/img/figure2.png)
+<p align="center"><img src="imgs/figure2.png"/></p>
 
 This semester project will seek to leverage on the novel concept of Mid Level Representations (MLR) [9], [10].
 As shown in Figure 2 domain invariant MLR can be used as initial ‘filtering stage’ of the raw RGB image. Thus, the policy network downstream uses not the raw RGB image but rather the features from the MLR. A promising candidate for such MLR are the semantic segmentation networks. However, a limit in their performance is their domain invariance and ability to train them with minimum amount of real data. 
 
-![Image text](https://gitlab.epfl.ch/TOPO_MachineLearning/visnav_topo/visnav_semantics/-/blob/main/img/figure3.png)
+<p align="center"><img src="imgs/figure3.png"/></p>
 
 The purpose of this semester project will be to study state of the art semantic segmentation networks performance in and out of domain of training with provided by the project semantic segmentation labels available from Suisse TOPO as shown in Figure 3.
 The task will be as following:
@@ -41,9 +41,8 @@ References:
 [11]	J. Hoffman et al., “CyCADA: Cycle-Consistent Adversarial Domain Adaptation,” 2018.
 
 
-
-
 ## Install dependencies
+The project is composed of 3 parts: data generation (semantic-recovery), baseline 
 
 
 
